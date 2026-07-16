@@ -4,10 +4,19 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>cycling-game-v2</title>
+    <title>Cycling Game v2 — Downhill</title>
+    <meta name="description" content="A first-person physics-driven downhill cycling game built with Three.js and cannon-es." />
   </head>
   <body>
+    <!-- Loading overlay shown while assets load -->
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+      <p>Loading terrain…</p>
+    </div>
+
+    <!-- Three.js renderer is appended here -->
     <div id="app"></div>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
