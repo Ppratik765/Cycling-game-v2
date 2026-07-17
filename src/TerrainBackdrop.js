@@ -1,30 +1,19 @@
 /* ============================================================
  *  TerrainBackdrop.js
  *  A large cylinder with noise-displaced top rim to simulate
- *  distant mountains. Follows the camera for parallax.
+ *  distant mountains. Loads its own textures independently.
  * ============================================================ */
 
 import * as THREE from 'three';
 import { createNoise2D } from 'simplex-noise';
 
 export class TerrainBackdrop {
-  /**
-   * @param {object}     opts
-   * @param {THREE.Scene} opts.scene
-   * @param {number}     opts.radius    - Cylinder radius
-   * @param {number}     opts.height    - Cylinder height above ground
-   * @param {number}     opts.segments  - Radial segments
-   * @param {number}     opts.seed      - Noise seed
-   */
-  constructor({ 
-    scene, 
-    diffuseMap, 
-    normalMap, 
-    roughnessMap,
-    radius = 800, 
-    height = 200, 
-    segments = 64, 
-    seed = 77 
+  constructor({
+    scene,
+    radius = 800,
+    height = 200,
+    segments = 64,
+    seed = 77
   }) {
     this.scene = scene;
 
@@ -32,14 +21,14 @@ export class TerrainBackdrop {
     const prng = this._mulberry32(seed);
     const noise = createNoise2D(prng);
 
-    // Open-ended cylinder: no top cap, no bottom cap
+    // Open-ended cylinder
     const geo = new THREE.CylinderGeometry(
-      radius,    // radiusTop
-      radius,    // radiusBottom
-      height,    // height
-      segments,  // radialSegments
-      16,        // heightSegments (increased for smoother mesh)
-      true       // openEnded
+      radius,  // radiusTop
+      radius,  // radiusBottom
+      height,  // height
+      segments, // radialSegments
+      16,      // heightSegments — smooth mesh
+      true     // openEnded
     );
 
     const posAttr = geo.attributes.position;
@@ -50,13 +39,12 @@ export class TerrainBackdrop {
       const z = posAttr.getZ(i);
 
       if (y > 0) {
-        // Top vertices → displace upward with noise (mountain peaks)
         const angle = Math.atan2(z, x);
-        const peakNoise = noise(angle * 2.0, 0.0) * 60 +
-                          noise(angle * 5.0, 1.0) * 25;
+        const peakNoise =
+          noise(angle * 2.0, 0.0) * 60 +
+          noise(angle * 5.0, 1.0) * 25;
         posAttr.setY(i, y + Math.max(peakNoise, 0));
       } else {
-        // Bottom vertices → push well below ground
         posAttr.setY(i, -100);
       }
     }
@@ -64,30 +52,38 @@ export class TerrainBackdrop {
     geo.computeVertexNormals();
     posAttr.needsUpdate = true;
 
-    // Configure texture wrapping for the huge cylinder
-    [diffuseMap, normalMap, roughnessMap].forEach(tex => {
-      if (tex) {
-        tex.wrapS = THREE.RepeatWrapping;
-        tex.wrapT = THREE.RepeatWrapping;
-        tex.repeat.set(30, 10);
-      }
+    // ── Load FRESH textures exclusively for the backdrop ──────
+    const loader = new THREE.TextureLoader();
+
+    const diffuse   = loader.load('/textures/ground_grass_diffuse.jpg');
+    const normalTex = loader.load('/textures/ground_grass_normal.jpg');
+    const rough     = loader.load('/textures/ground_grass_rough.jpg');
+
+    [diffuse, normalTex, rough].forEach((tex) => {
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(30, 10);
     });
 
+    diffuse.colorSpace   = THREE.SRGBColorSpace;
+    normalTex.colorSpace = THREE.LinearSRGBColorSpace;
+    rough.colorSpace     = THREE.LinearSRGBColorSpace;
+
     const mat = new THREE.MeshStandardMaterial({
-      map: diffuseMap,
-      normalMap: normalMap,
-      roughnessMap: roughnessMap,
-      color: 0xffffff, // Pure white so textures show correctly
-      roughness: 0.9,
-      metalness: 0.0,
+      map:         diffuse,
+      normalMap:   normalTex,
+      roughnessMap: rough,
+      color:       0xffffff, // no tint — let the texture show
+      roughness:   0.9,
+      metalness:   0.0,
       flatShading: false,
-      side: THREE.BackSide, // We are inside the cylinder looking out
-      fog: true,
+      side:        THREE.BackSide,
+      fog:         true,
     });
 
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.receiveShadow = false;
-    this.mesh.castShadow = false;
+    this.mesh.castShadow    = false;
     this.scene.add(this.mesh);
   }
 
