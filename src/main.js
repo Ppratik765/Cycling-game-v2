@@ -57,7 +57,7 @@ async function init() {
 
   // ── Scene ─────────────────────────────────────────────────
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x8cb8d4, 150, 400);
+  scene.fog = new THREE.Fog(0x8cb8d4, 300, 1200);
 
   // ── Camera ────────────────────────────────────────────────
   const camera = new THREE.PerspectiveCamera(

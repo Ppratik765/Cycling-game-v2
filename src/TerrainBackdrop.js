@@ -78,7 +78,7 @@ export class TerrainBackdrop {
       metalness:   0.0,
       flatShading: false,
       side:        THREE.BackSide,
-      fog:         true,
+      fog:         false, // Explicitly disable fog so textures are visible at any distance
     });
 
     this.mesh = new THREE.Mesh(geo, mat);
