@@ -1,14 +1,13 @@
 /* ============================================================
  *  Cycling Game v2 — main.js
- *  Phase 1: Core Engine, Atmosphere, Backdrop
- *  Phase 2: Terrain Chunks & Shader Splatting
+ *  Phase 1–3: Engine, Terrain, Atmosphere
+ *  Phase 4:   Player Mechanics & Bike Physics
  * ============================================================ */
 
 import './style.css';
 
 // ── Three.js ────────────────────────────────────────────────
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 
 // ── Physics ─────────────────────────────────────────────────
@@ -32,6 +31,7 @@ import { TrailSpline } from './TrailSpline.js';
 import { createSplatMaterial } from './CustomSplatShader.js';
 import { TerrainBackdrop } from './TerrainBackdrop.js';
 import { TerrainChunkManager } from './TerrainChunkManager.js';
+import { PlayerController } from './PlayerController.js';
 
 /* ============================================================
  *  Boot — async because Rapier WASM must initialise first
@@ -62,19 +62,12 @@ async function init() {
 
   // ── Camera ────────────────────────────────────────────────
   const camera = new THREE.PerspectiveCamera(
-    78,
+    98,  // Wide GoPro FOV
     window.innerWidth / window.innerHeight,
-    0.5,
+    0.1,
     2000
   );
-  camera.position.set(0, 35, 50);
-
-  // ── OrbitControls (development) ───────────────────────────
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
-  controls.target.set(0, 0, -50);
-  controls.maxPolarAngle = Math.PI * 0.48;
+  camera.position.set(0, 5, 0);
 
   // ── Lighting ──────────────────────────────────────────────
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
@@ -164,11 +157,16 @@ async function init() {
   });
 
   // Force initial 3x3 chunk generation
-  chunkManager.init(controls.target.x, controls.target.z);
+  chunkManager.init(0, 0);
 
-  // ── Debug helpers ─────────────────────────────────────────
-  const axesHelper = new THREE.AxesHelper(15);
-  scene.add(axesHelper);
+  // ── Player Controller ─────────────────────────────────────
+  const player = new PlayerController({
+    RAPIER,
+    rapierWorld,
+    scene,
+    camera,
+    spawnPos: new THREE.Vector3(0, noiseGen.getHeight(0, 0) + 3, 0),
+  });
 
   // ── Window resize ─────────────────────────────────────────
   function onResize() {
@@ -194,23 +192,24 @@ async function init() {
     rapierWorld.timestep = delta;
     rapierWorld.step();
 
-    // 2. Update terrain chunks
-    chunkManager.update(controls.target.x, controls.target.z);
+    // 2. Update player controller
+    player.update(delta);
+    const playerPos = player.getPosition();
 
-    // 3. Update backdrop parallax
+    // 3. Update terrain chunks around player
+    chunkManager.update(playerPos.x, playerPos.z);
+
+    // 4. Update backdrop parallax
     backdrop.update(camera);
 
-    // 4. Follow sun light to camera
+    // 5. Follow sun light to player
     sunLight.position.set(
-      controls.target.x + 80,
+      playerPos.x + 80,
       120,
-      controls.target.z + 60
+      playerPos.z + 60
     );
-    sunLight.target.position.copy(controls.target);
+    sunLight.target.position.set(playerPos.x, playerPos.y, playerPos.z);
     sunLight.target.updateMatrixWorld();
-
-    // 5. Controls
-    controls.update();
 
     // 6. Render with post-processing
     composer.render(delta);
