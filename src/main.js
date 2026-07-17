@@ -159,7 +159,7 @@ async function init() {
   // ── Player Controller ─────────────────────────────────────
   // Spawn ON the trail curve so terrain is guaranteed to be there
   const spawnZ = 0;
-  const spawnX = Math.sin(spawnZ * 0.015) * 20.0 + Math.sin(spawnZ * 0.005) * 40.0;
+  const spawnX = Math.sin(spawnZ * 0.02) * 25.0 + Math.sin(spawnZ * 0.008) * 40.0 + Math.sin(spawnZ * 0.05) * 8.0;
   const spawnY = noiseGen.getHeight(spawnX, spawnZ) + 10.0;
   const player = new PlayerController({
     RAPIER,

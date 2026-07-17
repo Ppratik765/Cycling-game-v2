@@ -17,7 +17,7 @@ const TRAIL_DENSE    = 15.0;
 
 // ── Trail equation (must match CustomSplatShader.js) ─────────
 function trailCurveX(z) {
-  return Math.sin(z * 0.015) * 20.0 + Math.sin(z * 0.005) * 40.0;
+  return Math.sin(z * 0.02) * 25.0 + Math.sin(z * 0.008) * 40.0 + Math.sin(z * 0.05) * 8.0;
 }
 function distToTrail(x, z) {
   return Math.abs(x - trailCurveX(z));

@@ -52,7 +52,7 @@ float hash(vec2 p) {
 }
 float getDistanceToTrail(vec2 p) {
     // Infinite sinusoidal curve meandering along Z
-    float curveX = sin(p.y * 0.015) * 20.0 + sin(p.y * 0.005) * 40.0;
+    float curveX = sin(p.y * 0.02) * 25.0 + sin(p.y * 0.008) * 40.0 + sin(p.y * 0.05) * 8.0;
     return abs(p.x - curveX);
 }`;
 
