@@ -42,8 +42,8 @@ export class TerrainChunkManager {
     this.chunkQueue = [];
     const cx = Math.round(focusX / this.chunkSize);
     const cz = Math.round(focusZ / this.chunkSize);
-    for (let dx = -2; dx <= 2; dx++) {
-      for (let dz = -2; dz <= 2; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
         this._createChunk(cx + dx, cz + dz);
       }
     }
@@ -74,9 +74,9 @@ export class TerrainChunkManager {
 
     const desired = new Set();
 
-    // 5x5 grid completely hides pop-in behind the fog wall
-    for (let dx = -2; dx <= 2; dx++) {
-      for (let dz = -2; dz <= 2; dz++) {
+    // 3x3 grid restored to save massive GPU overhead
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
         desired.add(`${cx + dx},${cz + dz}`);
       }
     }
