@@ -57,7 +57,7 @@ async function init() {
 
   // ── Scene ─────────────────────────────────────────────────
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0xb0c4d4, 0.0015);
+  scene.fog = new THREE.Fog(0x8cb8d4, 150, 400);
 
   // ── Camera ────────────────────────────────────────────────
   const camera = new THREE.PerspectiveCamera(
@@ -115,7 +115,7 @@ async function init() {
   });
   const vignetteEffect = new VignetteEffect({ darkness: 0.4, offset: 0.3 });
   const noiseEffect = new NoiseEffect({ blendFunction: BlendFunction.OVERLAY });
-  noiseEffect.blendMode.opacity.value = 0.06;
+  noiseEffect.blendMode.opacity.value = 0.025;
   const smaaEffect = new SMAAEffect();
 
   const effectPass = new EffectPass(camera, ssaoEffect, vignetteEffect, noiseEffect, smaaEffect);

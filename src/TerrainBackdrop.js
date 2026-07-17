@@ -55,11 +55,8 @@ export class TerrainBackdrop {
     geo.computeVertexNormals();
     posAttr.needsUpdate = true;
 
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0x1a3326,     // Dark green-blue
-      roughness: 1.0,
-      metalness: 0.0,
-      flatShading: true,
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x8cb8d4,     // Match fog color exactly
       side: THREE.BackSide, // We are inside the cylinder looking out
       fog: true,
     });

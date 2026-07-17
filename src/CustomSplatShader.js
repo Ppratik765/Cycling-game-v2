@@ -80,7 +80,7 @@ float hash(vec2 p) {
 vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
 float dist = getDistanceToTrail(vWorldPos.xz);
 float edgeNoise = (hash(vWorldPos.xz * 0.5) - 0.5) * 1.5;
-vTrailMix = 1.0 - smoothstep(3.5 + edgeNoise, 6.0 + edgeNoise, dist);
+vTrailMix = 1.0 - smoothstep(7.0 + edgeNoise, 12.0 + edgeNoise, dist);
 `;
 
   const fragmentShaderPars = `
