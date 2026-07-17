@@ -39,15 +39,27 @@ function chunkSeed(cx, cz) {
 
 // ── Geometry builders ────────────────────────────────────────
 
-/** Grass tuft: two planes intersecting at 90° forming an "X" */
+/** Grass tuft: A thick cluster of 4 planes to simulate high density */
 function createGrassTuft() {
   const w = 0.16, h = 1.8;
-  const planeA = new THREE.PlaneGeometry(w * 2, h, 1, 3);
-  planeA.translate(0, h / 2, 0);
-  const planeB = new THREE.PlaneGeometry(w * 2, h, 1, 3);
-  planeB.rotateY(Math.PI / 2);
-  planeB.translate(0, h / 2, 0);
-  return mergeGeometries([planeA, planeB]);
+  const planes = [];
+  
+  // Create 4 planes rotated at 45 degree intervals (0, 45, 90, 135)
+  for (let i = 0; i < 4; i++) {
+    const plane = new THREE.PlaneGeometry(w * 2, h, 1, 3);
+    plane.rotateY((Math.PI / 4) * i);
+    
+    // Add a slight lean to make the clump fan outward
+    const leanX = (i % 2 === 0 ? 0.15 : -0.15);
+    const leanZ = (i > 1 ? 0.15 : -0.15);
+    plane.rotateX(leanX);
+    plane.rotateZ(leanZ);
+    
+    plane.translate(0, h / 2, 0);
+    planes.push(plane);
+  }
+  
+  return mergeGeometries(planes);
 }
 
 /** Layered pine canopy only (trunk is separate) */
