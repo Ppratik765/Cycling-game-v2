@@ -65,7 +65,7 @@ export class PlayerController {
     this.rigidBody = rapierWorld.createRigidBody(bodyDesc);
 
     const colliderDesc = R.ColliderDesc.capsule(CAPSULE_HALF_H, CAPSULE_RADIUS)
-      .setFriction(0.7)
+      .setFriction(0.0) // Zero friction so the non-rolling capsule can slide smoothly
       .setRestitution(0.0)
       .setMass(75);                  // ~75 kg cyclist
 
@@ -197,7 +197,14 @@ export class PlayerController {
 
   _bindInput() {
     const handler = (e, pressed) => {
-      const key = e.key.toLowerCase();
+      let key = e.key.toLowerCase();
+      
+      // Map arrow keys to wasd
+      if (key === 'arrowup') key = 'w';
+      if (key === 'arrowdown') key = 's';
+      if (key === 'arrowleft') key = 'a';
+      if (key === 'arrowright') key = 'd';
+
       if (key in this.keys) {
         this.keys[key] = pressed;
         e.preventDefault();
