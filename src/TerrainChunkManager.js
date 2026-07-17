@@ -1,6 +1,7 @@
 /* ============================================================
  *  TerrainChunkManager.js
  *  3x3 infinite terrain grid with Rapier3D heightfield physics.
+ *  Uses chunk pooling — repositions chunks instead of recreating.
  * ============================================================ */
 
 import * as THREE from 'three';
@@ -18,7 +19,7 @@ export class TerrainChunkManager {
    * @param {THREE.Material} opts.material     - Shared terrain material
    * @param {number}        opts.chunkSize     - World units per chunk edge
    */
-  constructor({ scene, rapierWorld, RAPIER, noiseGen, material, chunkSize = 64 }) {
+  constructor({ scene, rapierWorld, RAPIER, noiseGen, material, chunkSize = 200 }) {
     this.scene = scene;
     this.world = rapierWorld;
     this.RAPIER = RAPIER;
@@ -26,8 +27,10 @@ export class TerrainChunkManager {
     this.material = material;
     this.chunkSize = chunkSize;
 
-    /** Map of "cx,cz" → { mesh, rigidBody, collider } */
+    /** Map of "cx,cz" → { mesh, rigidBody, collider, cx, cz } */
     this.chunks = new Map();
+    /** Pool of disposed chunk objects ready for reuse */
+    this._pool = [];
     this._lastCX = Infinity;
     this._lastCZ = Infinity;
   }
@@ -46,8 +49,8 @@ export class TerrainChunkManager {
   }
 
   /**
-   * Call each frame with the camera (or OrbitControls.target) position.
-   * Only rebuilds when the camera crosses a chunk boundary.
+   * Call each frame with the player's position.
+   * Only repositions when the player crosses a chunk boundary.
    */
   update(focusX, focusZ) {
     const cx = Math.round(focusX / this.chunkSize);
@@ -62,18 +65,22 @@ export class TerrainChunkManager {
     // 3x3 grid
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        const key = `${cx + dx},${cz + dz}`;
-        desired.add(key);
-        if (!this.chunks.has(key)) {
-          this._createChunk(cx + dx, cz + dz);
-        }
+        desired.add(`${cx + dx},${cz + dz}`);
       }
     }
 
-    // Cull chunks no longer in the 3x3
+    // Pool chunks that are no longer needed
     for (const [key, chunk] of this.chunks) {
       if (!desired.has(key)) {
-        this._disposeChunk(key, chunk);
+        this._poolChunk(key, chunk);
+      }
+    }
+
+    // Create or reuse chunks for new positions
+    for (const key of desired) {
+      if (!this.chunks.has(key)) {
+        const [ncx, ncz] = key.split(',').map(Number);
+        this._createChunk(ncx, ncz);
       }
     }
   }
@@ -85,17 +92,34 @@ export class TerrainChunkManager {
     const segs = SEGMENTS;
     const verts = segs + 1; // vertices per axis
 
-    // ── Three.js Geometry ──────────────────────────────────────
-    const geo = new THREE.PlaneGeometry(size, size, segs, segs);
-    geo.rotateX(-Math.PI / 2); // Face +Y
-
-    const posAttr = geo.attributes.position;
     const worldOriginX = cx * size;
     const worldOriginZ = cz * size;
 
-    // Heights stored in column-major order for Rapier
-    // Rapier heightfield: nrows × ncols, column-major
-    const heightData = new Float32Array(verts * verts);
+    // Try to reuse a pooled chunk
+    const pooled = this._pool.pop();
+    let geo, mesh, heightData;
+
+    if (pooled) {
+      // Reuse existing mesh & geometry
+      mesh = pooled.mesh;
+      geo = mesh.geometry;
+
+      // Remove old physics
+      this.world.removeCollider(pooled.collider, true);
+      this.world.removeRigidBody(pooled.rigidBody);
+    } else {
+      // Create new geometry & mesh
+      geo = new THREE.PlaneGeometry(size, size, segs, segs);
+      geo.rotateX(-Math.PI / 2); // Face +Y
+      mesh = new THREE.Mesh(geo, this.material);
+      mesh.receiveShadow = true;
+      mesh.castShadow = false;
+      this.scene.add(mesh);
+    }
+
+    // ── Recompute heights ───────────────────────────────────
+    const posAttr = geo.attributes.position;
+    heightData = new Float32Array(verts * verts);
 
     for (let i = 0; i < posAttr.count; i++) {
       const localX = posAttr.getX(i);
@@ -107,10 +131,6 @@ export class TerrainChunkManager {
       const h = this.noise.getHeight(worldX, worldZ);
       posAttr.setY(i, h);
 
-      // PlaneGeometry after rotateX(-PI/2) lays out:
-      //   row = floor(i / verts)  → Z axis
-      //   col = i % verts         → X axis
-      // Rapier wants column-major: index = col * verts + row
       const row = Math.floor(i / verts);
       const col = i % verts;
       heightData[col * verts + row] = h;
@@ -119,16 +139,10 @@ export class TerrainChunkManager {
     geo.computeVertexNormals();
     posAttr.needsUpdate = true;
 
-    const mesh = new THREE.Mesh(geo, this.material);
-    mesh.receiveShadow = true;
-    mesh.castShadow = false;
     mesh.position.set(worldOriginX, 0, worldOriginZ);
-    this.scene.add(mesh);
 
     // ── Rapier3D Heightfield ───────────────────────────────────
     const R = this.RAPIER;
-    const nrows = segs; // number of subdivisions (not vertices)
-    const ncols = segs;
 
     const bodyDesc = R.RigidBodyDesc.fixed().setTranslation(
       worldOriginX,
@@ -138,25 +152,20 @@ export class TerrainChunkManager {
     const rigidBody = this.world.createRigidBody(bodyDesc);
 
     const colliderDesc = R.ColliderDesc.heightfield(
-      nrows,
-      ncols,
+      segs,
+      segs,
       heightData,
       { x: size, y: 1.0, z: size }
     );
     const collider = this.world.createCollider(colliderDesc, rigidBody);
 
     const key = `${cx},${cz}`;
-    this.chunks.set(key, { mesh, rigidBody, collider });
+    this.chunks.set(key, { mesh, rigidBody, collider, cx, cz });
   }
 
-  _disposeChunk(key, chunk) {
-    this.scene.remove(chunk.mesh);
-    chunk.mesh.geometry.dispose();
-    // Material is shared, don't dispose it
-
-    this.world.removeCollider(chunk.collider, true);
-    this.world.removeRigidBody(chunk.rigidBody);
-
+  /** Move a chunk to the pool instead of destroying it */
+  _poolChunk(key, chunk) {
     this.chunks.delete(key);
+    this._pool.push(chunk);
   }
 }

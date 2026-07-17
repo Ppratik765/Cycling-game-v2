@@ -27,7 +27,6 @@ import {
 
 // ── Game modules ────────────────────────────────────────────
 import { NoiseGenerator } from './NoiseGenerator.js';
-import { TrailSpline } from './TrailSpline.js';
 import { createSplatMaterial } from './CustomSplatShader.js';
 import { TerrainBackdrop } from './TerrainBackdrop.js';
 import { TerrainChunkManager } from './TerrainChunkManager.js';
@@ -57,8 +56,8 @@ async function init() {
 
   // ── Scene ─────────────────────────────────────────────────
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog('#cdd1d3', 40, 300);
-  scene.background = new THREE.Color('#cdd1d3');
+  scene.fog = new THREE.Fog('#b5b9bc', 80, 280);
+  scene.background = new THREE.Color('#b5b9bc');
 
   // ── Camera ────────────────────────────────────────────────
   const camera = new THREE.PerspectiveCamera(
@@ -126,17 +125,10 @@ async function init() {
   const dirtNormal = loadTex('/textures/dirt_trail_normal.jpg');
   const dirtRough = loadTex('/textures/dirt_trail_rough.jpg');
 
-  // ── Trail Spline ──────────────────────────────────────────
-  const trail = new TrailSpline({ length: 4000, spacing: 40, wanderScale: 30 });
-
   // ── Splat Material ────────────────────────────────────────
   const terrainMaterial = createSplatMaterial({
     grassDiffuse, grassNormal, grassRough,
     dirtDiffuse, dirtNormal, dirtRough,
-    trailSegments: trail.getSegmentData(),
-    segmentCount: trail.getSegmentCount(),
-    trailWidth: 3.5,
-    blendEdge: 2.0,
     renderer,
   });
 
@@ -153,7 +145,7 @@ async function init() {
     RAPIER,
     noiseGen,
     material: terrainMaterial,
-    chunkSize: 64,
+    chunkSize: 200,
   });
 
   // Force initial 3x3 chunk generation

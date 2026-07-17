@@ -53,7 +53,7 @@ export class TerrainBackdrop {
     posAttr.needsUpdate = true;
 
     const mat = new THREE.MeshBasicMaterial({
-      color: 0x8a8678, // Muted, hazy dirt — blends with overcast fog
+      color: 0xb5b9bc, // Exact match to fog/sky horizon — hazy silhouette
       side:  THREE.BackSide,
       fog:   true,
     });

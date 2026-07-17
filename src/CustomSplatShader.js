@@ -7,10 +7,6 @@ export function createSplatMaterial({
   dirtDiffuse,
   dirtNormal,
   dirtRough,
-  trailSegments,
-  segmentCount,
-  trailWidth = 3.5,
-  blendEdge = 2.0,
   renderer,
 }) {
   const REPEAT = 12;
@@ -41,38 +37,23 @@ export function createSplatMaterial({
     side: THREE.FrontSide,
   });
 
-  // Convert trailSegments to vec2 array for the shader (using first 8 points for now based on user provided logic)
-  const trailPoints = [];
-  for (let i = 0; i < 8; i++) {
-     trailPoints.push(new THREE.Vector2(trailSegments[i*4], trailSegments[i*4+1]));
-  }
-
   mat.userData.uniforms = {
     map2: { value: dirtDiffuse },
     normalMap2: { value: dirtNormal },
     roughnessMap2: { value: dirtRough },
-    trailPoints: { value: trailPoints }
   };
 
+  // ── Vertex shader: infinite meandering trail via math ──────
   const vertexShaderPars = `
 varying vec3 vWorldPos;
 varying float vTrailMix;
-uniform vec2 trailPoints[8];
-float distToLineSegment(vec2 p, vec2 a, vec2 b) {
-    vec2 pa = p - a, ba = b - a;
-    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
-    return length( pa - ba*h );
-}
-float getDistanceToTrail(vec2 p) {
-    float minDist = 99999.0;
-    for(int i = 0; i < 7; i++) {
-        float d = distToLineSegment(p, trailPoints[i], trailPoints[i+1]);
-        minDist = min(minDist, d);
-    }
-    return minDist;
-}
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(12.989, 78.233))) * 43758.54);
+}
+float getDistanceToTrail(vec2 p) {
+    // Infinite sinusoidal curve meandering along Z
+    float curveX = sin(p.y * 0.015) * 20.0 + sin(p.y * 0.005) * 40.0;
+    return abs(p.x - curveX);
 }`;
 
   const vertexShaderMain = `
@@ -83,6 +64,7 @@ float edgeNoise = (hash(vWorldPos.xz * 0.5) - 0.5) * 1.5;
 vTrailMix = 1.0 - smoothstep(7.0 + edgeNoise, 12.0 + edgeNoise, dist);
 `;
 
+  // ── Fragment shader: blend dirt textures by vTrailMix ──────
   const fragmentShaderPars = `
 varying vec3 vWorldPos;
 varying float vTrailMix;
@@ -139,7 +121,7 @@ uniform sampler2D roughnessMap2;
     );
   };
 
-  mat.customProgramCacheKey = () => 'splatTerrain_v3';
+  mat.customProgramCacheKey = () => 'splatTerrain_v4_infinite';
 
   return mat;
 }
