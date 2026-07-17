@@ -16,7 +16,16 @@ export class TerrainBackdrop {
    * @param {number}     opts.segments  - Radial segments
    * @param {number}     opts.seed      - Noise seed
    */
-  constructor({ scene, radius = 800, height = 200, segments = 64, seed = 77 }) {
+  constructor({ 
+    scene, 
+    diffuseMap, 
+    normalMap, 
+    roughnessMap,
+    radius = 800, 
+    height = 200, 
+    segments = 64, 
+    seed = 77 
+  }) {
     this.scene = scene;
 
     // Simple seeded PRNG
@@ -29,7 +38,7 @@ export class TerrainBackdrop {
       radius,    // radiusBottom
       height,    // height
       segments,  // radialSegments
-      8,         // heightSegments
+      16,        // heightSegments (increased for smoother mesh)
       true       // openEnded
     );
 
@@ -55,8 +64,23 @@ export class TerrainBackdrop {
     geo.computeVertexNormals();
     posAttr.needsUpdate = true;
 
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x8cb8d4,     // Match fog color exactly
+    // Configure texture wrapping for the huge cylinder
+    [diffuseMap, normalMap, roughnessMap].forEach(tex => {
+      if (tex) {
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(30, 10);
+      }
+    });
+
+    const mat = new THREE.MeshStandardMaterial({
+      map: diffuseMap,
+      normalMap: normalMap,
+      roughnessMap: roughnessMap,
+      color: 0x8cb8d4, // Tint slightly with fog color
+      roughness: 0.9,
+      metalness: 0.0,
+      flatShading: false,
       side: THREE.BackSide, // We are inside the cylinder looking out
       fog: true,
     });

@@ -150,7 +150,12 @@ async function init() {
   const noiseGen = new NoiseGenerator({ seed: 42 });
 
   // ── Terrain Backdrop ──────────────────────────────────────
-  const backdrop = new TerrainBackdrop({ scene });
+  const backdrop = new TerrainBackdrop({ 
+    scene,
+    diffuseMap: grassDiffuse,
+    normalMap: grassNormal,
+    roughnessMap: grassRough
+  });
 
   // ── Terrain Chunk Manager ─────────────────────────────────
   const chunkManager = new TerrainChunkManager({
