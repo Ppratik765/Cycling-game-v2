@@ -157,7 +157,7 @@ async function init() {
     rapierWorld,
     scene,
     camera,
-    spawnPos: new THREE.Vector3(0, noiseGen.getHeight(0, 0) + 3, 0),
+    spawnPos: new THREE.Vector3(0, noiseGen.getHeight(0, 0) + 10, 0),
   });
 
   // ── Window resize ─────────────────────────────────────────

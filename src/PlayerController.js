@@ -8,9 +8,9 @@ import * as THREE from 'three';
 
 // ── Tuning Constants ────────────────────────────────────────
 
-const MAX_SPEED         = 32.0;   // m/s forward
-const ACCELERATION      = 8.0;    // m/s² when pedalling (W)
-const BRAKE_DECEL       = 16.0;   // m/s² braking force (S while moving fwd)
+const MAX_SPEED         = 40.0;   // m/s forward
+const ACCELERATION      = 12.0;   // m/s² when pedalling (W)
+const BRAKE_DECEL       = 20.0;   // m/s² braking force (S while moving fwd)
 const REVERSE_MAX_SPEED = 6.0;    // m/s reverse
 const REVERSE_ACCEL     = 4.0;    // m/s² reverse acceleration
 
@@ -121,16 +121,13 @@ export class PlayerController {
     const vel = this.rigidBody.linvel();
     this._forward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
 
-    // Project current velocity onto forward direction
-    const fwdSpeed = vel.x * this._forward.x + vel.z * this._forward.z;
-
     let targetAccel = 0;
 
     if (this.keys.w) {
       // Pedal: accelerate toward max speed
       targetAccel = ACCELERATION;
     } else if (this.keys.s) {
-      if (fwdSpeed > 0.5) {
+      if (this.currentSpeed > 0.5) {
         // Braking while moving forward
         targetAccel = -BRAKE_DECEL;
       } else {
@@ -138,24 +135,27 @@ export class PlayerController {
         targetAccel = -REVERSE_ACCEL;
       }
     } else {
-      // No input: gentle auto-forward push
-      if (fwdSpeed < AUTO_FORWARD) {
+      // No input: gentle auto-forward push or slight coasting friction
+      if (this.currentSpeed < AUTO_FORWARD) {
         targetAccel = ACCELERATION * 0.3;
+      } else {
+        targetAccel = -2.0; // slight drag when coasting
       }
     }
 
+    // Update virtual speed (decoupled from physical velocity so bumps don't instantly kill momentum)
+    this.currentSpeed += targetAccel * delta;
+
     // Clamp speed
-    const newSpeed = fwdSpeed + targetAccel * delta;
-    let clampedSpeed;
-    if (this.keys.s && fwdSpeed <= 0) {
-      clampedSpeed = Math.max(newSpeed, -REVERSE_MAX_SPEED);
+    if (this.keys.s && this.currentSpeed <= 0) {
+      this.currentSpeed = Math.max(this.currentSpeed, -REVERSE_MAX_SPEED);
     } else {
-      clampedSpeed = Math.min(newSpeed, MAX_SPEED);
+      this.currentSpeed = Math.min(Math.max(this.currentSpeed, 0), MAX_SPEED);
     }
 
     // Compute desired velocity
-    const desiredVelX = this._forward.x * clampedSpeed;
-    const desiredVelZ = this._forward.z * clampedSpeed;
+    const desiredVelX = this._forward.x * this.currentSpeed;
+    const desiredVelZ = this._forward.z * this.currentSpeed;
 
     // Apply precise velocity (arcade-style), preserving Y for gravity/falling
     this.rigidBody.setLinvel({ x: desiredVelX, y: vel.y, z: desiredVelZ }, true);
