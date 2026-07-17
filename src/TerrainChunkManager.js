@@ -37,12 +37,13 @@ export class TerrainChunkManager {
     this._lastCZ = Infinity;
   }
 
-  /** Force-spawn all 9 chunks centered on (focusX, focusZ). Call once at init. */
+  /** Force-spawn all chunks centered on (focusX, focusZ). Call once at init. */
   init(focusX = 0, focusZ = 0) {
+    this.chunkQueue = [];
     const cx = Math.round(focusX / this.chunkSize);
     const cz = Math.round(focusZ / this.chunkSize);
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
         this._createChunk(cx + dx, cz + dz);
       }
     }
@@ -55,6 +56,15 @@ export class TerrainChunkManager {
    * Only repositions when the player crosses a chunk boundary.
    */
   update(focusX, focusZ) {
+    // Process one chunk from the queue per frame to prevent massive FPS spikes
+    if (this.chunkQueue && this.chunkQueue.length > 0) {
+      const nextKey = this.chunkQueue.shift();
+      if (!this.chunks.has(nextKey)) {
+        const [ncx, ncz] = nextKey.split(',').map(Number);
+        this._createChunk(ncx, ncz);
+      }
+    }
+
     const cx = Math.round(focusX / this.chunkSize);
     const cz = Math.round(focusZ / this.chunkSize);
 
@@ -64,9 +74,9 @@ export class TerrainChunkManager {
 
     const desired = new Set();
 
-    // 3x3 grid
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dz = -1; dz <= 1; dz++) {
+    // 5x5 grid completely hides pop-in behind the fog wall
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
         desired.add(`${cx + dx},${cz + dz}`);
       }
     }
@@ -78,11 +88,10 @@ export class TerrainChunkManager {
       }
     }
 
-    // Create or reuse chunks for new positions
+    // Queue chunks for new positions instead of generating them all synchronously
     for (const key of desired) {
-      if (!this.chunks.has(key)) {
-        const [ncx, ncz] = key.split(',').map(Number);
-        this._createChunk(ncx, ncz);
+      if (!this.chunks.has(key) && !this.chunkQueue.includes(key)) {
+        this.chunkQueue.push(key);
       }
     }
 
