@@ -1,8 +1,8 @@
 /* ============================================================
  *  TerrainBackdrop.js
- *  A sweeping valley bowl that connects the central terrain chunks
- *  to distant procedural mountains. Uses realistic brown/green
- *  vertex colors to match the terrain.
+ *  A large cylinder with noise-displaced top rim to simulate
+ *  distant mountains. Uses height-based vertex colors for a
+ *  photorealistic, massive scale look instead of textures.
  * ============================================================ */
 
 import * as THREE from 'three';
@@ -21,14 +21,12 @@ export class TerrainBackdrop {
     const prng = this._mulberry32(seed);
     const noise = createNoise2D(prng);
 
-    // We use a cylinder as a base, but we will deform all vertices
-    // to form a sweeping bowl/valley shape.
     const geo = new THREE.CylinderGeometry(
-      radius,    // top radius (will be modified)
-      radius,    // bottom radius (will be modified)
-      height,    // height (Y from -height/2 to height/2)
+      radius,
+      radius,
+      height,
       segments,
-      32,        // more height segments for a smooth sweeping curve
+      16,
       true
     );
 
@@ -38,10 +36,11 @@ export class TerrainBackdrop {
     const colors = new Float32Array(posAttr.count * 3);
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    // Realistic dry grass / mountain colors to match the brown-green terrain
-    const colorPeak = new THREE.Color(0x615b50); // Dry rock / distant brown peak
-    const colorMid  = new THREE.Color(0x596347); // Olive / dry grass
-    const colorBase = new THREE.Color(0x4a523a); // Darker olive green at the valley floor
+    // Define earthy colors that perfectly match the brown-green dirt/grass terrain
+    const colorSnow = new THREE.Color(0x5b5042);   // Dry earthy brown peaks
+    const colorRock = new THREE.Color(0x6a6b51);   // Dry brownish-green mid slopes
+    const colorForest = new THREE.Color(0x5c6144); // Muted olive grass base
+    const colorFog = new THREE.Color(0x989a94);    // Hazy greyish-brown fade at the very bottom
 
     const tempColor = new THREE.Color();
 
@@ -50,56 +49,40 @@ export class TerrainBackdrop {
       const x = posAttr.getX(i);
       const z = posAttr.getZ(i);
 
-      // Normalize original Y from [-100, 100] to [0, 1]
-      // 0 = bottom edge (connecting to chunks), 1 = top edge (mountain peaks)
-      const v = THREE.MathUtils.clamp((y - (-height / 2)) / height, 0, 1);
+      let finalY = y;
 
-      // Angle for circular shaping
-      const angle = Math.atan2(z, x);
-
-      // 1. Calculate the sweeping radius
-      // At v=0 (bottom), radius is 90 (just under the 3x3 chunks which span ~96 radius)
-      // At v=1 (top), radius is 800
-      // We use v^2 to create a gentle curve that goes out before going up
-      const rCurve = Math.pow(v, 1.5);
-      const currentRadius = THREE.MathUtils.lerp(90, radius, rCurve);
-
-      // 2. Calculate the sweeping height (finalY)
-      // Base is slightly below ground (-5) to hide seams
-      // Top goes up to 150 + noise
-      const peakNoise =
-        noise(angle * 2.0, 0.0) * 60 +
-        noise(angle * 5.0, 1.0) * 25 +
-        noise(angle * 12.0, 2.0) * 10;
+      if (y > 0) {
+        // Displace the top half to create peaks
+        const angle = Math.atan2(z, x);
+        const peakNoise =
+          noise(angle * 2.0, 0.0) * 60 +
+          noise(angle * 5.0, 1.0) * 25 +
+          noise(angle * 12.0, 2.0) * 10; // Extra detail octave
         
-      const topHeight = 100 + Math.max(peakNoise, 0);
-      
-      // We use a steeper power curve for Y so the ground stays relatively flat 
-      // near the chunks before ramping up into mountains
-      const yCurve = Math.pow(v, 3.0);
-      const finalY = THREE.MathUtils.lerp(-5, topHeight, yCurve);
-
-      // Apply the new position
-      const finalX = Math.cos(angle) * currentRadius;
-      const finalZ = Math.sin(angle) * currentRadius;
-      
-      posAttr.setX(i, finalX);
-      posAttr.setY(i, finalY);
-      posAttr.setZ(i, finalZ);
-
-      // 3. Apply vertex colors based on the normalized height 'v'
-      if (v > 0.6) {
-        // Peaks to Mid
-        const t = THREE.MathUtils.clamp((v - 0.6) / 0.4, 0, 1);
-        tempColor.lerpColors(colorMid, colorPeak, t);
+        finalY = y + Math.max(peakNoise, 0);
+        posAttr.setY(i, finalY);
       } else {
-        // Mid to Base
-        const t = THREE.MathUtils.clamp(v / 0.6, 0, 1);
-        tempColor.lerpColors(colorBase, colorMid, t);
+        finalY = -100;
+        posAttr.setY(i, finalY);
       }
 
-      // Add a tiny bit of noise to the color to break up smooth gradients
-      const colorNoise = noise(finalX * 0.1, finalZ * 0.1) * 0.03;
+      // Height-based coloring for scale realism
+      if (finalY > 75) {
+        // Snow to rock
+        const t = THREE.MathUtils.clamp((finalY - 75) / 25, 0, 1);
+        tempColor.lerpColors(colorRock, colorSnow, t);
+      } else if (finalY > 30) {
+        // Rock to forest
+        const t = THREE.MathUtils.clamp((finalY - 30) / 45, 0, 1);
+        tempColor.lerpColors(colorForest, colorRock, t);
+      } else {
+        // Forest fading into atmospheric fog color at the bottom
+        const t = THREE.MathUtils.clamp((finalY - (-50)) / 80, 0, 1);
+        tempColor.lerpColors(colorFog, colorForest, t);
+      }
+
+      // Add a tiny bit of noise to the color for texture
+      const colorNoise = noise(x * 0.1, z * 0.1) * 0.05;
       tempColor.r = THREE.MathUtils.clamp(tempColor.r + colorNoise, 0, 1);
       tempColor.g = THREE.MathUtils.clamp(tempColor.g + colorNoise, 0, 1);
       tempColor.b = THREE.MathUtils.clamp(tempColor.b + colorNoise, 0, 1);
@@ -115,11 +98,11 @@ export class TerrainBackdrop {
     // Use MeshStandardMaterial with vertexColors enabled
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 1.0,
-      metalness: 0.0,
-      flatShading: true, // Low-poly flat shading looks great on procedural terrain
+      roughness: 0.8,
+      metalness: 0.1, // Slight metalness gives rock a nice specular bounce
+      flatShading: false,
       side: THREE.BackSide,
-      fog: true, // Re-enable fog so it blends naturally into the sky
+      fog: false, // We manually fade into fog color at the base
     });
 
     this.mesh = new THREE.Mesh(geo, mat);
