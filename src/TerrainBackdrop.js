@@ -62,9 +62,23 @@ export class TerrainBackdrop {
     const mat = new THREE.MeshStandardMaterial({
       map: map,
       side: THREE.BackSide,
-      fog: true,
+      fog: false, // Disable built-in distance fog so it doesn't 100% white-out the texture
       roughness: 0.9,
     });
+
+    // Inject a fixed haze to fake atmospheric perspective without completely hiding the texture
+    mat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <dithering_fragment>',
+        `
+        #include <dithering_fragment>
+        // #b5b9bc converted to linear RGB approximately
+        vec3 hazeColor = vec3(0.71, 0.725, 0.737); 
+        // Mix 82% haze, leaving 18% of the mountain texture visible
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeColor, 0.82);
+        `
+      );
+    };
 
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.receiveShadow = false;
