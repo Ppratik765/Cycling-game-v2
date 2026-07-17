@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 
 /** Number of segments per chunk axis (= vertices - 1) */
-const SEGMENTS = 128;
+const SEGMENTS = 64;
 
 export class TerrainChunkManager {
   /**
