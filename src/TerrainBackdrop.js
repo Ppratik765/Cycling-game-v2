@@ -56,14 +56,14 @@ export class TerrainBackdrop {
     const map = texLoader.load('/textures/ground_grass_diffuse.jpg');
     map.wrapS = THREE.RepeatWrapping;
     map.wrapT = THREE.RepeatWrapping;
-    map.repeat.set(60, 10);
+    map.repeat.set(24, 4); // Scaled down so texture details are larger and more visible from afar
     map.colorSpace = THREE.SRGBColorSpace;
 
-    const mat = new THREE.MeshStandardMaterial({
+    // Use BasicMaterial so it doesn't require lighting to be visible at extreme distances
+    const mat = new THREE.MeshBasicMaterial({
       map: map,
       side: THREE.BackSide,
-      fog: false, // Disable built-in distance fog so it doesn't 100% white-out the texture
-      roughness: 0.9,
+      fog: false, // Disable built-in distance fog
     });
 
     // Inject a fixed haze to fake atmospheric perspective without completely hiding the texture
@@ -74,8 +74,8 @@ export class TerrainBackdrop {
         #include <dithering_fragment>
         // #b5b9bc converted to linear RGB approximately
         vec3 hazeColor = vec3(0.71, 0.725, 0.737); 
-        // Mix 82% haze, leaving 18% of the mountain texture visible
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeColor, 0.82);
+        // Mix 40% haze, leaving 60% of the mountain texture visible so it pops more
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeColor, 0.40);
         `
       );
     };
