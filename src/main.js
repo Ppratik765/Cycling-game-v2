@@ -168,7 +168,7 @@ async function init() {
   });
 
   // Force initial chunk generation
-  chunkManager.update(controls.target.x, controls.target.z);
+  chunkManager.update(camera.position.x, camera.position.z);
 
   // ── Debug helpers ─────────────────────────────────────────
   const axesHelper = new THREE.AxesHelper(15);
@@ -199,7 +199,7 @@ async function init() {
     rapierWorld.step();
 
     // 2. Update terrain chunks
-    chunkManager.update(controls.target.x, controls.target.z);
+    chunkManager.update(camera.position.x, camera.position.z);
 
     // 3. Update backdrop parallax
     backdrop.update(camera);

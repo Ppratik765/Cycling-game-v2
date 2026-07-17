@@ -77,7 +77,7 @@ export class TerrainBackdrop {
       map: diffuseMap,
       normalMap: normalMap,
       roughnessMap: roughnessMap,
-      color: 0x8cb8d4, // Tint slightly with fog color
+      color: 0xffffff, // White so textures aren't blue
       roughness: 0.9,
       metalness: 0.0,
       flatShading: false,
