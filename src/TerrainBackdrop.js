@@ -1,7 +1,7 @@
 /* ============================================================
  *  TerrainBackdrop.js
  *  A large cylinder with noise-displaced top rim to simulate
- *  distant mountains. Loads its own textures independently.
+ *  distant mountains. Uses vertex colors to fade into fog.
  * ============================================================ */
 
 import * as THREE from 'three';
@@ -32,9 +32,15 @@ export class TerrainBackdrop {
     );
 
     const posAttr = geo.attributes.position;
+    const colorData = new Float32Array(posAttr.count * 3);
+    
+    // The fog color we want the bottom to fade into
+    const fogColor = new THREE.Color('#b5b9bc');
+    // A slightly atmospheric tinted white for the peaks
+    const peakColor = new THREE.Color('#e0e6ed');
 
     for (let i = 0; i < posAttr.count; i++) {
-      const y = posAttr.getY(i);
+      let y = posAttr.getY(i);
       const x = posAttr.getX(i);
       const z = posAttr.getZ(i);
 
@@ -43,12 +49,24 @@ export class TerrainBackdrop {
         const peakNoise =
           noise(angle * 2.0, 0.0) * 60 +
           noise(angle * 5.0, 1.0) * 25;
-        posAttr.setY(i, y + Math.max(peakNoise, 0));
+        y = y + Math.max(peakNoise, 0);
+        posAttr.setY(i, y);
       } else {
-        posAttr.setY(i, -200); // Push well below ground to hide gaps
+        y = -200;
+        posAttr.setY(i, y); // Push well below ground to hide gaps
       }
+
+      // Calculate vertex color based on height
+      // Bottom (-200) is 100% fog color. Peaks (>0) approach peakColor.
+      const normalizedHeight = Math.max(0, Math.min(1, (y + 200) / 400));
+      const vertexColor = fogColor.clone().lerp(peakColor, normalizedHeight);
+      
+      colorData[i * 3] = vertexColor.r;
+      colorData[i * 3 + 1] = vertexColor.g;
+      colorData[i * 3 + 2] = vertexColor.b;
     }
 
+    geo.setAttribute('color', new THREE.BufferAttribute(colorData, 3));
     geo.computeVertexNormals();
     posAttr.needsUpdate = true;
 
@@ -62,7 +80,8 @@ export class TerrainBackdrop {
     const mat = new THREE.MeshStandardMaterial({
       map: map,
       side: THREE.BackSide,
-      fog: true,
+      vertexColors: true, // Use the colors we calculated to fade into the fog
+      fog: false,         // Disable global scene fog so it doesn't wash out completely
       roughness: 0.9,
     });
 
