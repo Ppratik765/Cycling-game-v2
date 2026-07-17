@@ -39,7 +39,7 @@ import { PlayerController } from './PlayerController.js';
 async function init() {
   // ── Rapier3D ──────────────────────────────────────────────
   await RAPIER.init();
-  const rapierWorld = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
+  const rapierWorld = new RAPIER.World({ x: 0.0, y: -14.0, z: 0.0 });
   console.log('✅ Rapier3D initialised');
 
   // ── Renderer ──────────────────────────────────────────────

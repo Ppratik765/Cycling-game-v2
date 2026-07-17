@@ -8,7 +8,7 @@ import * as THREE from 'three';
 
 // ── Tuning Constants ────────────────────────────────────────
 
-const MAX_SPEED         = 40.0;   // m/s forward
+const MAX_SPEED         = 32.0;   // m/s forward
 const ACCELERATION      = 12.0;   // m/s² when pedalling (W)
 const BRAKE_DECEL       = 20.0;   // m/s² braking force (S while moving fwd)
 const REVERSE_MAX_SPEED = 6.0;    // m/s reverse
