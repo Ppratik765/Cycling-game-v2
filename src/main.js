@@ -159,7 +159,7 @@ async function init() {
     RAPIER,
     noiseGen,
     material: terrainMaterial,
-    chunkSize: 64,
+    chunkSize: 128,
   });
 
   // Force initial chunk generation
