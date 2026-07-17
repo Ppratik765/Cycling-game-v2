@@ -60,6 +60,7 @@ export class PlayerController {
       .setTranslation(spawnPos.x, spawnPos.y + 2.0, spawnPos.z)
       .setLinearDamping(LINEAR_DAMPING)
       .setAngularDamping(ANGULAR_DAMPING)
+      .setCcdEnabled(true)           // Prevent tunneling through heightfield
       .lockRotations();              // lock all rotation axes
 
     this.rigidBody = rapierWorld.createRigidBody(bodyDesc);
