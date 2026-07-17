@@ -8,7 +8,7 @@ import * as THREE from 'three';
 
 // ── Constants ────────────────────────────────────────────────
 
-const GRASS_PER_CHUNK       = 40000;
+const GRASS_PER_CHUNK       = 50000;
 const PINE_PER_CHUNK        = 40;
 const BROADLEAF_PER_CHUNK   = 20;
 
@@ -41,7 +41,7 @@ function chunkSeed(cx, cz) {
 
 /** Grass tuft: two planes intersecting at 90° forming an "X" */
 function createGrassTuft() {
-  const w = 0.16, h = 1.8;
+  const w = 0.08, h = 1.8;
   const planeA = new THREE.PlaneGeometry(w * 2, h, 1, 3);
   planeA.translate(0, h / 2, 0);
   const planeB = new THREE.PlaneGeometry(w * 2, h, 1, 3);
@@ -277,7 +277,7 @@ export class FoliageSystem {
       if (dist < TRAIL_DENSE) continue;
       const height = this.noiseGen.getHeight(worldX, worldZ);
       const yRot = rng() * Math.PI * 2;
-      const s = 0.35 + rng() * 0.3;
+      const s = 0.45 + rng() * 0.35;
       this._mat4.compose(
         this._pos.set(worldX, height, worldZ),
         this._quat.setFromAxisAngle(this._up, yRot),
@@ -297,7 +297,7 @@ export class FoliageSystem {
       if (dist < TRAIL_DENSE) continue;
       const height = this.noiseGen.getHeight(worldX, worldZ);
       const yRot = rng() * Math.PI * 2;
-      const s = 0.3 + rng() * 0.3;
+      const s = 0.4 + rng() * 0.35;
       this._mat4.compose(
         this._pos.set(worldX, height, worldZ),
         this._quat.setFromAxisAngle(this._up, yRot),
