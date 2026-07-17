@@ -1,8 +1,7 @@
 /* ============================================================
  *  TerrainBackdrop.js
  *  A large cylinder with noise-displaced top rim to simulate
- *  distant mountains. Uses height-based vertex colors for a
- *  photorealistic, massive scale look instead of textures.
+ *  distant mountains. Loads its own textures independently.
  * ============================================================ */
 
 import * as THREE from 'three';
@@ -18,99 +17,54 @@ export class TerrainBackdrop {
   }) {
     this.scene = scene;
 
+    // Simple seeded PRNG
     const prng = this._mulberry32(seed);
     const noise = createNoise2D(prng);
 
+    // Open-ended cylinder
     const geo = new THREE.CylinderGeometry(
-      radius,
-      radius,
-      height,
-      segments,
-      16,
-      true
+      radius,  // radiusTop
+      radius,  // radiusBottom
+      height,  // height
+      segments, // radialSegments
+      16,      // heightSegments — smooth mesh
+      true     // openEnded
     );
 
     const posAttr = geo.attributes.position;
-    
-    // We will build an array for vertex colors
-    const colors = new Float32Array(posAttr.count * 3);
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    // Define earthy colors that perfectly match the brown-green dirt/grass terrain
-    const colorSnow = new THREE.Color(0x5b5042);   // Dry earthy brown peaks
-    const colorRock = new THREE.Color(0x6a6b51);   // Dry brownish-green mid slopes
-    const colorForest = new THREE.Color(0x5c6144); // Muted olive grass base
-    const colorFog = new THREE.Color(0x989a94);    // Hazy greyish-brown fade at the very bottom
-
-    const tempColor = new THREE.Color();
 
     for (let i = 0; i < posAttr.count; i++) {
       const y = posAttr.getY(i);
       const x = posAttr.getX(i);
       const z = posAttr.getZ(i);
 
-      let finalY = y;
-
       if (y > 0) {
-        // Displace the top half to create peaks
         const angle = Math.atan2(z, x);
         const peakNoise =
           noise(angle * 2.0, 0.0) * 60 +
-          noise(angle * 5.0, 1.0) * 25 +
-          noise(angle * 12.0, 2.0) * 10; // Extra detail octave
-        
-        finalY = y + Math.max(peakNoise, 0);
-        posAttr.setY(i, finalY);
+          noise(angle * 5.0, 1.0) * 25;
+        posAttr.setY(i, y + Math.max(peakNoise, 0));
       } else {
-        finalY = -100;
-        posAttr.setY(i, finalY);
+        posAttr.setY(i, -200); // Push well below ground to hide gaps
       }
-
-      // Height-based coloring for scale realism
-      if (finalY > 75) {
-        // Snow to rock
-        const t = THREE.MathUtils.clamp((finalY - 75) / 25, 0, 1);
-        tempColor.lerpColors(colorRock, colorSnow, t);
-      } else if (finalY > 30) {
-        // Rock to forest
-        const t = THREE.MathUtils.clamp((finalY - 30) / 45, 0, 1);
-        tempColor.lerpColors(colorForest, colorRock, t);
-      } else {
-        // Forest fading into atmospheric fog color at the bottom
-        const t = THREE.MathUtils.clamp((finalY - (-50)) / 80, 0, 1);
-        tempColor.lerpColors(colorFog, colorForest, t);
-      }
-
-      // Add a tiny bit of noise to the color for texture
-      const colorNoise = noise(x * 0.1, z * 0.1) * 0.05;
-      tempColor.r = THREE.MathUtils.clamp(tempColor.r + colorNoise, 0, 1);
-      tempColor.g = THREE.MathUtils.clamp(tempColor.g + colorNoise, 0, 1);
-      tempColor.b = THREE.MathUtils.clamp(tempColor.b + colorNoise, 0, 1);
-
-      colors[i * 3 + 0] = tempColor.r;
-      colors[i * 3 + 1] = tempColor.g;
-      colors[i * 3 + 2] = tempColor.b;
     }
 
     geo.computeVertexNormals();
     posAttr.needsUpdate = true;
 
-    // Use MeshStandardMaterial with vertexColors enabled
-    const mat = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.8,
-      metalness: 0.1, // Slight metalness gives rock a nice specular bounce
-      flatShading: false,
-      side: THREE.BackSide,
-      fog: false, // We manually fade into fog color at the base
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x3b4d3c, // Dark, desaturated olive-green/brown
+      side:  THREE.BackSide,
+      fog:   true,     // Let atmospheric fog wash it out
     });
 
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.receiveShadow = false;
-    this.mesh.castShadow = false;
+    this.mesh.castShadow    = false;
     this.scene.add(this.mesh);
   }
 
+  /** Call each frame — follows camera X, Z for parallax. */
   update(camera) {
     this.mesh.position.x = camera.position.x;
     this.mesh.position.z = camera.position.z;
