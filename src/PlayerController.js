@@ -8,7 +8,7 @@ import * as THREE from 'three';
 
 // ── Tuning Constants ────────────────────────────────────────
 
-const MAX_SPEED         = 32.0;   // m/s forward
+const MAX_SPEED         = 26.0;   // m/s forward
 const ACCELERATION      = 12.0;   // m/s² when pedalling (W)
 const BRAKE_DECEL       = 20.0;   // m/s² braking force (S while moving fwd)
 const REVERSE_MAX_SPEED = 6.0;    // m/s reverse
@@ -18,7 +18,7 @@ const LEAN_MAX_DEG      = 15.0;   // max visual roll in degrees (reduced for les
 const LEAN_SPEED        = 2.5;    // lerp speed for lean (reduced for smoother transition)
 const TURN_RATE         = 1.2;    // yaw rate multiplier (reduced for realistic carving)
 
-const CAM_HEIGHT        = 2.0;    // Y offset above collider centre (GoPro mount)
+const CAM_HEIGHT        = 2.6;    // Y offset above collider centre (GoPro mount)
 const CAM_SMOOTH_POS    = 6.0;    // position spring stiffness
 const CAM_SMOOTH_ROT    = 8.0;    // rotation spring stiffness
 
