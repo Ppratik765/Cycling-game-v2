@@ -188,6 +188,8 @@ async function init() {
   const timer = new THREE.Timer();
   timer.connect(document);
   const MAX_DELTA = 0.1;
+  const TIME_STEP = 1 / 60;
+  let physicsAccumulator = 0;
   let elapsed = 0;
 
   function animate(timestamp) {
@@ -196,9 +198,13 @@ async function init() {
     timer.update(timestamp);
     const delta = Math.min(timer.getDelta(), MAX_DELTA);
 
-    // 1. Step physics
-    rapierWorld.timestep = delta;
-    rapierWorld.step();
+    // 1. Step physics with fixed timestep accumulator (prevents tunneling on lag spikes)
+    physicsAccumulator += delta;
+    rapierWorld.timestep = TIME_STEP;
+    while (physicsAccumulator >= TIME_STEP) {
+      rapierWorld.step();
+      physicsAccumulator -= TIME_STEP;
+    }
 
     // 2. Update player controller
     player.update(delta);

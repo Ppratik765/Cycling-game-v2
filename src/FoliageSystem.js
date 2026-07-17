@@ -242,11 +242,14 @@ export class FoliageSystem {
     const worldOriginZ = cz * chunkSize;
     const rng = mulberry32(chunkSeed(cx, cz));
 
-    const grassT = [];
-    const pineCanopyT = [];
-    const pineTrunkT = [];
-    const broadCanopyT = [];
-    const broadTrunkT = [];
+    // Pre-allocate buffers for massive performance gains (no GC hit from Matrix4 cloning)
+    const grassBuffer = new Float32Array(GRASS_PER_CHUNK * 16);
+    const pineBuffer = new Float32Array(PINE_PER_CHUNK * 16);
+    const broadBuffer = new Float32Array(BROADLEAF_PER_CHUNK * 16);
+
+    let grassCount = 0;
+    let pineCount = 0;
+    let broadCount = 0;
 
     // ── Grass pass ────────────────────────────────────────────
     for (let i = 0; i < GRASS_PER_CHUNK; i++) {
@@ -264,7 +267,8 @@ export class FoliageSystem {
         this._quat.setFromAxisAngle(this._up, yRot),
         this._scale.set(s, s + rng() * 0.5, s)
       );
-      grassT.push(this._mat4.clone());
+      this._mat4.toArray(grassBuffer, grassCount * 16);
+      grassCount++;
     }
 
     // ── Pine trees ────────────────────────────────────────────
@@ -283,8 +287,8 @@ export class FoliageSystem {
         this._quat.setFromAxisAngle(this._up, yRot),
         this._scale.set(s, s, s)
       );
-      pineCanopyT.push(this._mat4.clone());
-      pineTrunkT.push(this._mat4.clone());
+      this._mat4.toArray(pineBuffer, pineCount * 16);
+      pineCount++;
     }
 
     // ── Broadleaf trees ───────────────────────────────────────
@@ -303,16 +307,17 @@ export class FoliageSystem {
         this._quat.setFromAxisAngle(this._up, yRot),
         this._scale.set(s, s, s)
       );
-      broadCanopyT.push(this._mat4.clone());
-      broadTrunkT.push(this._mat4.clone());
+      this._mat4.toArray(broadBuffer, broadCount * 16);
+      broadCount++;
     }
 
     // ── Create InstancedMeshes ────────────────────────────────
     const entry = {};
-    const addIM = (geo, mat, transforms, name, castShadow) => {
-      if (transforms.length === 0) return;
-      const m = new THREE.InstancedMesh(geo, mat, transforms.length);
-      for (let i = 0; i < transforms.length; i++) m.setMatrixAt(i, transforms[i]);
+    const addIM = (geo, mat, buffer, count, name, castShadow) => {
+      if (count === 0) return;
+      const m = new THREE.InstancedMesh(geo, mat, count);
+      // Copy the pre-allocated float32 array directly into the instanceMatrix attribute
+      m.instanceMatrix.array.set(buffer.subarray(0, count * 16));
       m.instanceMatrix.needsUpdate = true;
       m.castShadow = castShadow;
       m.receiveShadow = false;
@@ -321,11 +326,11 @@ export class FoliageSystem {
       entry[name] = m;
     };
 
-    addIM(this._grassGeo,       this._grassMat,     grassT,        'grass',        false);
-    addIM(this._pineCanopyGeo,  this._pineLeafMat,  pineCanopyT,   'pineCanopy',   true);
-    addIM(this._pineTrunkGeo,   this._trunkMat,     pineTrunkT,    'pineTrunk',    true);
-    addIM(this._broadCanopyGeo, this._broadLeafMat,  broadCanopyT,  'broadCanopy',  true);
-    addIM(this._broadTrunkGeo,  this._trunkMat,     broadTrunkT,   'broadTrunk',   true);
+    addIM(this._grassGeo,       this._grassMat,     grassBuffer, grassCount, 'grass',        false);
+    addIM(this._pineCanopyGeo,  this._pineLeafMat,  pineBuffer,  pineCount,  'pineCanopy',   true);
+    addIM(this._pineTrunkGeo,   this._trunkMat,     pineBuffer,  pineCount,  'pineTrunk',    true);
+    addIM(this._broadCanopyGeo, this._broadLeafMat, broadBuffer, broadCount, 'broadCanopy',  true);
+    addIM(this._broadTrunkGeo,  this._trunkMat,     broadBuffer, broadCount, 'broadTrunk',   true);
 
     this.chunkFoliage.set(key, entry);
   }
