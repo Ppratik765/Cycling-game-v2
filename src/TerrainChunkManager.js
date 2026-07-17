@@ -28,10 +28,21 @@ export class TerrainChunkManager {
 
     /** Map of "cx,cz" → { mesh, rigidBody, collider } */
     this.chunks = new Map();
-
-    /** Last known camera chunk coords — skip update if unchanged */
     this._lastCX = Infinity;
     this._lastCZ = Infinity;
+  }
+
+  /** Force-spawn all 9 chunks centered on (focusX, focusZ). Call once at init. */
+  init(focusX = 0, focusZ = 0) {
+    const cx = Math.round(focusX / this.chunkSize);
+    const cz = Math.round(focusZ / this.chunkSize);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        this._createChunk(cx + dx, cz + dz);
+      }
+    }
+    this._lastCX = cx;
+    this._lastCZ = cz;
   }
 
   /**

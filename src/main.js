@@ -57,7 +57,8 @@ async function init() {
 
   // ── Scene ─────────────────────────────────────────────────
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x8cb8d4, 300, 1200);
+  scene.fog = new THREE.Fog('#cdd1d3', 40, 300);
+  scene.background = new THREE.Color('#cdd1d3');
 
   // ── Camera ────────────────────────────────────────────────
   const camera = new THREE.PerspectiveCamera(
@@ -162,8 +163,8 @@ async function init() {
     chunkSize: 64,
   });
 
-  // Force initial chunk generation
-  chunkManager.update(controls.target.x, controls.target.z);
+  // Force initial 3x3 chunk generation
+  chunkManager.init(controls.target.x, controls.target.z);
 
   // ── Debug helpers ─────────────────────────────────────────
   const axesHelper = new THREE.AxesHelper(15);

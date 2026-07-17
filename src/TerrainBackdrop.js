@@ -11,7 +11,7 @@ export class TerrainBackdrop {
   constructor({
     scene,
     radius = 800,
-    height = 200,
+    height = 400,
     segments = 64,
     seed = 77
   }) {
@@ -53,14 +53,15 @@ export class TerrainBackdrop {
     posAttr.needsUpdate = true;
 
     const mat = new THREE.MeshBasicMaterial({
-      color: 0x3b4d3c, // Dark, desaturated olive-green/brown
+      color: 0x8a8678, // Muted, hazy dirt — blends with overcast fog
       side:  THREE.BackSide,
-      fog:   true,     // Let atmospheric fog wash it out
+      fog:   true,
     });
 
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.receiveShadow = false;
     this.mesh.castShadow    = false;
+    this.mesh.position.y    = -50; // Bury the base so no gap appears below terrain
     this.scene.add(this.mesh);
   }
 
