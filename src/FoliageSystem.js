@@ -8,9 +8,9 @@ import * as THREE from 'three';
 
 // ── Constants ────────────────────────────────────────────────
 
-const GRASS_PER_CHUNK       = 25000;
-const PINE_PER_CHUNK        = 120;
-const BROADLEAF_PER_CHUNK   = 60;
+const GRASS_PER_CHUNK       = 40000;
+const PINE_PER_CHUNK        = 40;
+const BROADLEAF_PER_CHUNK   = 20;
 
 const TRAIL_CLEAR    = 6.0;
 const TRAIL_DENSE    = 15.0;
@@ -116,30 +116,11 @@ function mergeGeometries(geos) {
 // ── Wind material factory ────────────────────────────────────
 
 function createGrassMaterial(uTimeRef) {
-  const texLoader = new THREE.TextureLoader();
-
-  const diffuse = texLoader.load('/textures/ground_grass_diffuse.jpg');
-  diffuse.wrapS = THREE.RepeatWrapping;
-  diffuse.wrapT = THREE.RepeatWrapping;
-  diffuse.colorSpace = THREE.SRGBColorSpace;
-
-  const normalMap = texLoader.load('/textures/ground_grass_normal.jpg');
-  normalMap.wrapS = THREE.RepeatWrapping;
-  normalMap.wrapT = THREE.RepeatWrapping;
-
-  const roughMap = texLoader.load('/textures/ground_grass_rough.jpg');
-  roughMap.wrapS = THREE.RepeatWrapping;
-  roughMap.wrapT = THREE.RepeatWrapping;
-
   const mat = new THREE.MeshStandardMaterial({
-    map: diffuse,
-    normalMap: normalMap,
-    normalScale: new THREE.Vector2(0.8, 0.8),
-    roughnessMap: roughMap,
+    color: 0x2d5a27, // A realistic, lush green
     roughness: 0.9,
     metalness: 0.0,
     side: THREE.DoubleSide,
-    alphaTest: 0.1,
   });
 
   mat.onBeforeCompile = (shader) => {
@@ -296,7 +277,7 @@ export class FoliageSystem {
       if (dist < TRAIL_DENSE) continue;
       const height = this.noiseGen.getHeight(worldX, worldZ);
       const yRot = rng() * Math.PI * 2;
-      const s = 0.6 + rng() * 0.6;
+      const s = 0.35 + rng() * 0.3;
       this._mat4.compose(
         this._pos.set(worldX, height, worldZ),
         this._quat.setFromAxisAngle(this._up, yRot),
@@ -316,7 +297,7 @@ export class FoliageSystem {
       if (dist < TRAIL_DENSE) continue;
       const height = this.noiseGen.getHeight(worldX, worldZ);
       const yRot = rng() * Math.PI * 2;
-      const s = 0.5 + rng() * 0.6;
+      const s = 0.3 + rng() * 0.3;
       this._mat4.compose(
         this._pos.set(worldX, height, worldZ),
         this._quat.setFromAxisAngle(this._up, yRot),

@@ -160,7 +160,7 @@ async function init() {
   // Spawn ON the trail curve so terrain is guaranteed to be there
   const spawnZ = 0;
   const spawnX = Math.sin(spawnZ * 0.015) * 20.0 + Math.sin(spawnZ * 0.005) * 40.0;
-  const spawnY = noiseGen.getHeight(spawnX, spawnZ) + 3.0;
+  const spawnY = noiseGen.getHeight(spawnX, spawnZ) + 10.0;
   const player = new PlayerController({
     RAPIER,
     rapierWorld,
@@ -170,7 +170,7 @@ async function init() {
   });
 
   // Pre-step physics so the player settles onto terrain before rendering
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++) {
     rapierWorld.timestep = 1 / 60;
     rapierWorld.step();
   }
