@@ -41,7 +41,7 @@ function chunkSeed(cx, cz) {
 
 /** Grass tuft: A thick cluster of 4 planes to simulate high density */
 function createGrassTuft() {
-  const w = 0.16, h = 1.8;
+  const w = 0.12, h = 1.6;
   const planes = [];
   
   // Create 4 planes rotated at 45 degree intervals (0, 45, 90, 135)
