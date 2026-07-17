@@ -157,12 +157,8 @@ export class PlayerController {
     const desiredVelX = this._forward.x * clampedSpeed;
     const desiredVelZ = this._forward.z * clampedSpeed;
 
-    // Apply as impulse (difference between desired and current)
-    const mass = this.rigidBody.mass();
-    const impulseX = (desiredVelX - vel.x) * mass * 0.3;
-    const impulseZ = (desiredVelZ - vel.z) * mass * 0.3;
-
-    this.rigidBody.applyImpulse({ x: impulseX, y: 0, z: impulseZ }, true);
+    // Apply precise velocity (arcade-style), preserving Y for gravity/falling
+    this.rigidBody.setLinvel({ x: desiredVelX, y: vel.y, z: desiredVelZ }, true);
   }
 
   // ── Camera ──────────────────────────────────────────────────
