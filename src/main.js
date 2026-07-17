@@ -157,13 +157,23 @@ async function init() {
   chunkManager.init(0, 0);
 
   // ── Player Controller ─────────────────────────────────────
+  // Spawn ON the trail curve so terrain is guaranteed to be there
+  const spawnZ = 0;
+  const spawnX = Math.sin(spawnZ * 0.015) * 20.0 + Math.sin(spawnZ * 0.005) * 40.0;
+  const spawnY = noiseGen.getHeight(spawnX, spawnZ) + 3.0;
   const player = new PlayerController({
     RAPIER,
     rapierWorld,
     scene,
     camera,
-    spawnPos: new THREE.Vector3(0, noiseGen.getHeight(0, 0) + 10, 0),
+    spawnPos: new THREE.Vector3(spawnX, spawnY, spawnZ),
   });
+
+  // Pre-step physics so the player settles onto terrain before rendering
+  for (let i = 0; i < 30; i++) {
+    rapierWorld.timestep = 1 / 60;
+    rapierWorld.step();
+  }
 
   // ── Window resize ─────────────────────────────────────────
   function onResize() {
