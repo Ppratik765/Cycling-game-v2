@@ -52,10 +52,18 @@ export class TerrainBackdrop {
     geo.computeVertexNormals();
     posAttr.needsUpdate = true;
 
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xb5b9bc, // Exact match to fog/sky horizon — hazy silhouette
-      side:  THREE.BackSide,
-      fog:   true,
+    const texLoader = new THREE.TextureLoader();
+    const map = texLoader.load('/textures/ground_grass_diffuse.jpg');
+    map.wrapS = THREE.RepeatWrapping;
+    map.wrapT = THREE.RepeatWrapping;
+    map.repeat.set(60, 10);
+    map.colorSpace = THREE.SRGBColorSpace;
+
+    const mat = new THREE.MeshStandardMaterial({
+      map: map,
+      side: THREE.BackSide,
+      fog: true,
+      roughness: 0.9,
     });
 
     this.mesh = new THREE.Mesh(geo, mat);

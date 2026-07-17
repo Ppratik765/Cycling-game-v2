@@ -64,8 +64,9 @@ export class PlayerController {
 
     this.rigidBody = rapierWorld.createRigidBody(bodyDesc);
 
-    const colliderDesc = R.ColliderDesc.capsule(CAPSULE_HALF_H, CAPSULE_RADIUS)
-      .setFriction(0.0) // Zero friction so the non-rolling capsule can slide smoothly
+    // Use a ball (sphere) collider instead of a capsule so it glides perfectly over heightfield seams
+    const colliderDesc = R.ColliderDesc.ball(0.5)
+      .setFriction(0.0) // Zero friction so the non-rolling ball can slide smoothly
       .setRestitution(0.0)
       .setMass(75);                  // ~75 kg cyclist
 
