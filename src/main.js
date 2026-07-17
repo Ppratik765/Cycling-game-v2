@@ -31,6 +31,7 @@ import { createSplatMaterial } from './CustomSplatShader.js';
 import { TerrainBackdrop } from './TerrainBackdrop.js';
 import { TerrainChunkManager } from './TerrainChunkManager.js';
 import { PlayerController } from './PlayerController.js';
+import { FoliageSystem } from './FoliageSystem.js';
 
 /* ============================================================
  *  Boot — async because Rapier WASM must initialise first
@@ -138,6 +139,9 @@ async function init() {
   // ── Terrain Backdrop ──────────────────────────────────────
   const backdrop = new TerrainBackdrop({ scene });
 
+  // ── Foliage System ────────────────────────────────────────
+  const foliage = new FoliageSystem(scene, noiseGen);
+
   // ── Terrain Chunk Manager ─────────────────────────────────
   const chunkManager = new TerrainChunkManager({
     scene,
@@ -145,6 +149,7 @@ async function init() {
     RAPIER,
     noiseGen,
     material: terrainMaterial,
+    foliage,
     chunkSize: 200,
   });
 
@@ -173,6 +178,7 @@ async function init() {
   const timer = new THREE.Timer();
   timer.connect(document);
   const MAX_DELTA = 0.1;
+  let elapsed = 0;
 
   function animate(timestamp) {
     requestAnimationFrame(animate);
@@ -190,6 +196,10 @@ async function init() {
 
     // 3. Update terrain chunks around player
     chunkManager.update(playerPos.x, playerPos.z);
+
+    // 3.5 Update foliage wind animation
+    elapsed += delta;
+    foliage.update(elapsed);
 
     // 4. Update backdrop parallax
     backdrop.update(camera);

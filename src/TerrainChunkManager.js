@@ -17,14 +17,16 @@ export class TerrainChunkManager {
    * @param {object}        opts.RAPIER        - RAPIER module reference
    * @param {object}        opts.noiseGen      - NoiseGenerator instance
    * @param {THREE.Material} opts.material     - Shared terrain material
+   * @param {object}        opts.foliage      - FoliageSystem instance
    * @param {number}        opts.chunkSize     - World units per chunk edge
    */
-  constructor({ scene, rapierWorld, RAPIER, noiseGen, material, chunkSize = 200 }) {
+  constructor({ scene, rapierWorld, RAPIER, noiseGen, material, foliage, chunkSize = 200 }) {
     this.scene = scene;
     this.world = rapierWorld;
     this.RAPIER = RAPIER;
     this.noise = noiseGen;
     this.material = material;
+    this.foliage = foliage;
     this.chunkSize = chunkSize;
 
     /** Map of "cx,cz" → { mesh, rigidBody, collider, cx, cz } */
@@ -83,6 +85,9 @@ export class TerrainChunkManager {
         this._createChunk(ncx, ncz);
       }
     }
+
+    // Prune foliage for chunks no longer in the grid
+    if (this.foliage) this.foliage.pruneExcept(desired);
   }
 
   // ── Internal ────────────────────────────────────────────────
@@ -161,6 +166,9 @@ export class TerrainChunkManager {
 
     const key = `${cx},${cz}`;
     this.chunks.set(key, { mesh, rigidBody, collider, cx, cz });
+
+    // Populate foliage for this chunk
+    if (this.foliage) this.foliage.populateChunk(cx, cz, size);
   }
 
   /** Move a chunk to the pool instead of destroying it */
