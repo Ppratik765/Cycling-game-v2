@@ -127,11 +127,11 @@ async function init() {
   const loadTex = (path) => texLoader.load(path);
 
   const grassDiffuse = loadTex('/textures/ground_grass_diffuse.jpg');
-  const grassNormal  = loadTex('/textures/ground_grass_normal.jpg');
-  const grassRough   = loadTex('/textures/ground_grass_rough.jpg');
-  const dirtDiffuse  = loadTex('/textures/dirt_trail_diffuse.jpg');
-  const dirtNormal   = loadTex('/textures/dirt_trail_normal.jpg');
-  const dirtRough    = loadTex('/textures/dirt_trail_rough.jpg');
+  const grassNormal = loadTex('/textures/ground_grass_normal.jpg');
+  const grassRough = loadTex('/textures/ground_grass_rough.jpg');
+  const dirtDiffuse = loadTex('/textures/dirt_trail_diffuse.jpg');
+  const dirtNormal = loadTex('/textures/dirt_trail_normal.jpg');
+  const dirtRough = loadTex('/textures/dirt_trail_rough.jpg');
 
   // ── Trail Spline ──────────────────────────────────────────
   const trail = new TrailSpline({ length: 4000, spacing: 40, wanderScale: 30 });
