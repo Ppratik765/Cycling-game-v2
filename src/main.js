@@ -50,7 +50,7 @@ async function init() {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 0.65; // Lower exposure for a moodier overcast look
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.appendChild(renderer.domElement);
 
@@ -75,7 +75,7 @@ async function init() {
   const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x556633, 0.6);
   scene.add(hemiLight);
 
-  const sunLight = new THREE.DirectionalLight(0xfff4e5, 2.5);
+  const sunLight = new THREE.DirectionalLight(0xfff4e5, 1.2); // Reduced intensity for overcast feel
   sunLight.position.set(80, 120, 60);
   sunLight.castShadow = true;
   sunLight.shadow.mapSize.set(2048, 2048);
