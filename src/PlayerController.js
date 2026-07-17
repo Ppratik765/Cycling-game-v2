@@ -18,7 +18,7 @@ const LEAN_MAX_DEG      = 15.0;   // max visual roll in degrees (reduced for les
 const LEAN_SPEED        = 2.5;    // lerp speed for lean (reduced for smoother transition)
 const TURN_RATE         = 1.2;    // yaw rate multiplier (reduced for realistic carving)
 
-const CAM_HEIGHT        = 1.6;    // Y offset above collider centre (GoPro mount)
+const CAM_HEIGHT        = 2.0;    // Y offset above collider centre (GoPro mount)
 const CAM_SMOOTH_POS    = 6.0;    // position spring stiffness
 const CAM_SMOOTH_ROT    = 8.0;    // rotation spring stiffness
 
