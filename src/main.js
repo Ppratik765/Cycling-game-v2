@@ -23,6 +23,7 @@ import {
   VignetteEffect,
   NoiseEffect,
   SMAAEffect,
+  BlendFunction
 } from 'postprocessing';
 
 // ── Game modules ────────────────────────────────────────────
@@ -113,7 +114,8 @@ async function init() {
     luminanceInfluence: 0.6,
   });
   const vignetteEffect = new VignetteEffect({ darkness: 0.4, offset: 0.3 });
-  const noiseEffect = new NoiseEffect({ opacity: 0.06 });
+  const noiseEffect = new NoiseEffect({ blendFunction: BlendFunction.OVERLAY });
+  noiseEffect.blendMode.opacity.value = 0.06;
   const smaaEffect = new SMAAEffect();
 
   const effectPass = new EffectPass(camera, ssaoEffect, vignetteEffect, noiseEffect, smaaEffect);
@@ -145,13 +147,7 @@ async function init() {
   });
 
   // ── Noise Generator ───────────────────────────────────────
-  const noiseGen = new NoiseGenerator({
-    seed: 42,
-    macroScale: 0.0008,
-    macroAmplitude: 45,
-    detailScale: 0.08,
-    detailAmplitude: 0.5,
-  });
+  const noiseGen = new NoiseGenerator({ seed: 42 });
 
   // ── Terrain Backdrop ──────────────────────────────────────
   const backdrop = new TerrainBackdrop({ scene });

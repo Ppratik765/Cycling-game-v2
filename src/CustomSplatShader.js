@@ -1,29 +1,5 @@
-/* ============================================================
- *  CustomSplatShader.js
- *  Patches MeshStandardMaterial via onBeforeCompile to blend
- *  grass & dirt textures based on distance to a trail spline.
- * ============================================================ */
-
 import * as THREE from 'three';
 
-/**
- * Create a terrain splat material that blends grass and dirt textures
- * using distance to a trail spline.
- *
- * @param {object} opts
- * @param {THREE.Texture} opts.grassDiffuse
- * @param {THREE.Texture} opts.grassNormal
- * @param {THREE.Texture} opts.grassRough
- * @param {THREE.Texture} opts.dirtDiffuse
- * @param {THREE.Texture} opts.dirtNormal
- * @param {THREE.Texture} opts.dirtRough
- * @param {Float32Array}  opts.trailSegments  - Flat [x1,z1,x2,z2, ...]
- * @param {number}        opts.segmentCount   - Number of line segments
- * @param {number}        opts.trailWidth     - Half-width of the dirt trail
- * @param {number}        opts.blendEdge      - Smoothstep edge width
- * @param {THREE.WebGLRenderer} opts.renderer - For max anisotropy
- * @returns {THREE.MeshStandardMaterial}
- */
 export function createSplatMaterial({
   grassDiffuse,
   grassNormal,
@@ -37,7 +13,6 @@ export function createSplatMaterial({
   blendEdge = 2.0,
   renderer,
 }) {
-  // ── Configure all textures for tiling ───────────────────────
   const REPEAT = 12;
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
@@ -48,7 +23,6 @@ export function createSplatMaterial({
     tex.anisotropy = maxAniso;
   });
 
-  // Diffuse textures are sRGB; normal & rough are linear
   grassDiffuse.colorSpace = THREE.SRGBColorSpace;
   dirtDiffuse.colorSpace = THREE.SRGBColorSpace;
   grassNormal.colorSpace = THREE.LinearSRGBColorSpace;
@@ -56,20 +30,6 @@ export function createSplatMaterial({
   dirtNormal.colorSpace = THREE.LinearSRGBColorSpace;
   dirtRough.colorSpace = THREE.LinearSRGBColorSpace;
 
-  // ── Build the DataTexture for trail segments ────────────────
-  // We pack the segment data into a DataTexture for efficient GPU access.
-  // Each texel holds one float packed into the R channel (Float type).
-  // We use a 1D texture of width = segmentCount * 4 (x1,z1,x2,z2 per segment).
-  const segTex = new THREE.DataTexture(
-    trailSegments,
-    segmentCount * 4,
-    1,
-    THREE.RedFormat,
-    THREE.FloatType
-  );
-  segTex.needsUpdate = true;
-
-  // ── Base material (grass as default) ────────────────────────
   const mat = new THREE.MeshStandardMaterial({
     map: grassDiffuse,
     normalMap: grassNormal,
@@ -77,134 +37,109 @@ export function createSplatMaterial({
     roughnessMap: grassRough,
     roughness: 0.85,
     metalness: 0.0,
+    flatShading: false,
     side: THREE.FrontSide,
   });
 
-  // ── Custom uniforms ─────────────────────────────────────────
+  // Convert trailSegments to vec2 array for the shader (using first 8 points for now based on user provided logic)
+  const trailPoints = [];
+  for (let i = 0; i < 8; i++) {
+     trailPoints.push(new THREE.Vector2(trailSegments[i*4], trailSegments[i*4+1]));
+  }
+
   mat.userData.uniforms = {
-    uDirtDiffuse:  { value: dirtDiffuse },
-    uDirtNormal:   { value: dirtNormal },
-    uDirtRough:    { value: dirtRough },
-    uTrailSegments: { value: segTex },
-    uSegmentCount: { value: segmentCount },
-    uTrailWidth:   { value: trailWidth },
-    uBlendEdge:    { value: blendEdge },
+    map2: { value: dirtDiffuse },
+    normalMap2: { value: dirtNormal },
+    roughnessMap2: { value: dirtRough },
+    trailPoints: { value: trailPoints }
   };
 
-  // ── Shader patching ─────────────────────────────────────────
+  const vertexShaderPars = `
+varying vec3 vWorldPos;
+varying float vTrailMix;
+uniform vec2 trailPoints[8];
+float distToLineSegment(vec2 p, vec2 a, vec2 b) {
+    vec2 pa = p - a, ba = b - a;
+    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+    return length( pa - ba*h );
+}
+float getDistanceToTrail(vec2 p) {
+    float minDist = 99999.0;
+    for(int i = 0; i < 7; i++) {
+        float d = distToLineSegment(p, trailPoints[i], trailPoints[i+1]);
+        minDist = min(minDist, d);
+    }
+    return minDist;
+}
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(12.989, 78.233))) * 43758.54);
+}`;
+
+  const vertexShaderMain = `
+#include <worldpos_vertex>
+vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+float dist = getDistanceToTrail(vWorldPos.xz);
+float edgeNoise = (hash(vWorldPos.xz * 0.5) - 0.5) * 1.5;
+vTrailMix = 1.0 - smoothstep(3.5 + edgeNoise, 6.0 + edgeNoise, dist);
+`;
+
+  const fragmentShaderPars = `
+varying vec3 vWorldPos;
+varying float vTrailMix;
+uniform sampler2D map2;
+uniform sampler2D normalMap2;
+uniform sampler2D roughnessMap2;
+`;
+
+  const fragmentShaderMap = `
+#include <map_fragment>
+    vec4 dirtColor = texture2D(map2, vMapUv);
+    diffuseColor = mix(diffuseColor, dirtColor, vTrailMix);
+`;
+
+  const fragmentShaderNormal = `
+#include <normal_fragment_maps>
+    vec3 dirtNormal = texture2D(normalMap2, vNormalMapUv).xyz * 2.0 - 1.0;
+    normal = normalize(mix(normal, dirtNormal, vTrailMix));
+`;
+
+  const fragmentShaderRoughness = `
+#include <roughnessmap_fragment>
+    float dirtRoughness = texture2D(roughnessMap2, vRoughnessMapUv).g;
+    roughnessFactor = mix(roughnessFactor, dirtRoughness, vTrailMix);
+`;
+
   mat.onBeforeCompile = (shader) => {
-    // Inject our custom uniforms
     Object.assign(shader.uniforms, mat.userData.uniforms);
 
-    // ── VERTEX SHADER: pass world position to fragment ────────
     shader.vertexShader = shader.vertexShader.replace(
       '#include <common>',
-      /* glsl */ `
-        #include <common>
-        varying vec3 vWorldPos;
-      `
+      '#include <common>\n' + vertexShaderPars
     );
     shader.vertexShader = shader.vertexShader.replace(
       '#include <worldpos_vertex>',
-      /* glsl */ `
-        #include <worldpos_vertex>
-        vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
-      `
+      vertexShaderMain
     );
 
-    // ── FRAGMENT SHADER: blend grass/dirt ──────────────────────
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <common>',
-      /* glsl */ `
-        #include <common>
-        varying vec3 vWorldPos;
-
-        uniform sampler2D uDirtDiffuse;
-        uniform sampler2D uDirtNormal;
-        uniform sampler2D uDirtRough;
-        uniform sampler2D uTrailSegments;
-        uniform int   uSegmentCount;
-        uniform float uTrailWidth;
-        uniform float uBlendEdge;
-
-        // Distance from point P to line segment AB (2D, xz plane)
-        float distToSegment(vec2 p, vec2 a, vec2 b) {
-          vec2 ab = b - a;
-          vec2 ap = p - a;
-          float t = clamp(dot(ap, ab) / dot(ab, ab), 0.0, 1.0);
-          vec2 closest = a + t * ab;
-          return length(p - closest);
-        }
-
-        // Find minimum distance to trail spline
-        float getTrailDist(vec2 worldXZ) {
-          float minDist = 99999.0;
-          for (int i = 0; i < 512; i++) {
-            if (i >= uSegmentCount) break;
-            int base = i * 4;
-            float x1 = texelFetch(uTrailSegments, ivec2(base + 0, 0), 0).r;
-            float z1 = texelFetch(uTrailSegments, ivec2(base + 1, 0), 0).r;
-            float x2 = texelFetch(uTrailSegments, ivec2(base + 2, 0), 0).r;
-            float z2 = texelFetch(uTrailSegments, ivec2(base + 3, 0), 0).r;
-            float d = distToSegment(worldXZ, vec2(x1, z1), vec2(x2, z2));
-            minDist = min(minDist, d);
-          }
-          return minDist;
-        }
-      `
+      '#include <common>\n' + fragmentShaderPars
     );
-
-    // Replace the map_fragment chunk to blend the two texture sets
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <map_fragment>',
-      /* glsl */ `
-        // ── Splat blend ─────────────────────────────────────────
-        vec2 trailUV = vWorldPos.xz;
-        float trailDist = getTrailDist(trailUV);
-
-        // Add slight noise to the edge for organic look
-        float edgeNoise = fract(sin(dot(trailUV * 0.5, vec2(12.9898, 78.233))) * 43758.5453) * 0.8;
-        float blend = smoothstep(uTrailWidth - uBlendEdge, uTrailWidth + uBlendEdge + edgeNoise, trailDist);
-
-        // Sample dirt textures at same UV
-        vec2 splatUV = vMapUv;
-        vec4 dirtColor = texture2D(uDirtDiffuse, splatUV);
-
-        // Grass is already sampled as diffuseColor by the default map_fragment
-        #include <map_fragment>
-
-        // Blend: blend=0 is dirt (close to trail), blend=1 is grass (far)
-        diffuseColor = mix(dirtColor, diffuseColor, blend);
-      `
+      fragmentShaderMap
     );
-
-    // Similarly, blend the normal maps
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <normal_fragment_maps>',
-      /* glsl */ `
-        #include <normal_fragment_maps>
-        // Re-blend normal with dirt normal based on trail distance
-        vec3 dirtNormalSample = texture2D(uDirtNormal, vMapUv).xyz * 2.0 - 1.0;
-        // The standard normal_fragment_maps already computed 'normal' from the grass normalMap.
-        // We mix toward the dirt normal when close to the trail.
-        // (We re-use the 'blend' variable from map_fragment scope)
-        // Note: blend is already declared in the same function scope above.
-      `
+      fragmentShaderNormal
     );
-
-    // Blend roughness
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <roughnessmap_fragment>',
-      /* glsl */ `
-        #include <roughnessmap_fragment>
-        float dirtRoughVal = texture2D(uDirtRough, vMapUv).g;
-        roughnessFactor = mix(dirtRoughVal, roughnessFactor, blend);
-      `
+      fragmentShaderRoughness
     );
   };
 
-  // Needed for onBeforeCompile to trigger re-compilation
-  mat.customProgramCacheKey = () => 'splatTerrain_v1';
+  mat.customProgramCacheKey = () => 'splatTerrain_v3';
 
   return mat;
 }

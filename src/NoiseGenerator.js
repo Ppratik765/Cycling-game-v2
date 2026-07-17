@@ -1,6 +1,6 @@
 /* ============================================================
  *  NoiseGenerator.js
- *  Deterministic 2D simplex noise with macro + detail octaves.
+ *  Deterministic 2D simplex noise — 3 octaves for smooth terrain.
  * ============================================================ */
 
 import { createNoise2D } from 'simplex-noise';
@@ -17,36 +17,21 @@ function mulberry32(seed) {
 }
 
 export class NoiseGenerator {
-  /**
-   * @param {object} opts
-   * @param {number} opts.seed           - PRNG seed (default 42)
-   * @param {number} opts.macroScale     - Frequency of large rolling hills
-   * @param {number} opts.macroAmplitude - Max hill height
-   * @param {number} opts.detailScale    - Frequency of fine detail
-   * @param {number} opts.detailAmplitude - Max detail height
-   */
-  constructor({
-    seed = 42,
-    macroScale = 0.0008,
-    macroAmplitude = 45,
-    detailScale = 0.08,
-    detailAmplitude = 0.5,
-  } = {}) {
-    this.macroScale = macroScale;
-    this.macroAmplitude = macroAmplitude;
-    this.detailScale = detailScale;
-    this.detailAmplitude = detailAmplitude * macroAmplitude;
+  constructor({ seed = 42 } = {}) {
     this.noise2D = createNoise2D(mulberry32(seed));
   }
 
   /** Sample terrain height at world position (x, z). */
   getHeight(x, z) {
-    const macro =
-      this.noise2D(x * this.macroScale, z * this.macroScale) *
-      this.macroAmplitude;
-    const detail =
-      this.noise2D(x * this.detailScale, z * this.detailScale) *
-      this.detailAmplitude;
-    return macro + detail;
+    // 1. Macro hills — large, gentle rolling terrain
+    const macro = this.noise2D(x * 0.0008, z * 0.0008) * 45.0;
+
+    // 2. Low-frequency variation — medium undulation
+    const low = this.noise2D(x * 0.004, z * 0.004) * 18.0;
+
+    // 3. High-frequency bumps — subtle surface texture (exactly 0.5)
+    const bump = this.noise2D(x * 0.08, z * 0.08) * 0.5;
+
+    return macro + low + bump;
   }
 }
