@@ -71,7 +71,7 @@ export class TerrainBackdrop {
       roughness: 0.92,
       metalness: 0.0,
       side: THREE.BackSide,
-      fog: true,            // Participate in scene.fog instead of faking it
+      fog: false,           // Use custom distance-based haze instead of double-fogging
     });
 
     // Inject distance-based atmospheric haze in fragment shader
@@ -94,7 +94,7 @@ uniform vec3 uFogColor;
         float distFactor = clamp(length(vViewPosition) / 900.0, 0.0, 1.0);
         float heightFade = smoothstep(-100.0, 250.0, vHeight) * 0.2;
         float hazeMix = distFactor * 0.55 + heightFade;
-        hazeMix = clamp(hazeMix, 0.0, 0.75);
+        hazeMix = clamp(hazeMix, 0.0, 0.6); // Capped at 0.6 to retain brown mountain tint
         gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor, hazeMix);
         `
       );
