@@ -41,18 +41,19 @@ function chunkSeed(cx, cz) {
 
 /** Grass tuft: Efficient V-shape (2 planes) with upward normals for perfect terrain blending */
 function createGrassTuft() {
-  const w = 0.12, h = 1.6;
+  const w = 0.6, h = 1.6;
   const planes = [];
   
-  // Create 2 planes rotated at 90 degree intervals (0, 90) for a classic cross shape
-  for (let i = 0; i < 2; i++) {
+  // Create 3 planes rotated at 60 degree intervals (0, 60, 120) for a lush star shape
+  for (let i = 0; i < 3; i++) {
     const plane = new THREE.PlaneGeometry(w * 2, h, 1, 3);
-    plane.rotateY((Math.PI / 2) * i);
+    plane.rotateY((Math.PI / 3) * i);
     
-    // Add a slight lean to make the clump fan outward
-    const leanX = (i === 0 ? 0.15 : -0.15);
+    // Add varying leans to make the clump fan outward naturally
+    const leanX = (i === 0 ? 0.2 : (i === 1 ? -0.1 : 0.1));
+    const leanZ = (i === 1 ? 0.2 : -0.15);
     plane.rotateX(leanX);
-    plane.rotateZ(0.15);
+    plane.rotateZ(leanZ);
     
     plane.translate(0, h / 2, 0);
     planes.push(plane);
