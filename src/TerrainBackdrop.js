@@ -39,15 +39,28 @@ export class TerrainBackdrop {
       const x = posAttr.getX(i);
       const z = posAttr.getZ(i);
 
-      if (y > 0) {
-        const angle = Math.atan2(z, x);
-        const peakNoise =
-          noise(angle * 2.0, 0.0) * 60 +
-          noise(angle * 5.0, 1.0) * 25;
-        posAttr.setY(i, y + Math.max(peakNoise, 0));
-      } else {
-        posAttr.setY(i, -200); // Push well below ground to hide gaps
-      }
+      const angle = Math.atan2(z, x);
+      
+      // Vertical peaks
+      const peakNoise =
+        noise(angle * 2.0, 0.0) * 80 +
+        noise(angle * 6.0, 1.0) * 35;
+        
+      // Lateral ridges (ravines and cliffs)
+      const ridgeNoise = 
+        noise(angle * 4.0, y * 0.005) * 40 + 
+        noise(angle * 14.0, y * 0.01) * 15;
+
+      // Only displace the upper parts strongly, leaving the base smooth
+      const heightNorm = (y + height / 2) / height; 
+      
+      posAttr.setY(i, y + Math.max(peakNoise, 0) * heightNorm);
+      
+      const currentRadius = Math.sqrt(x * x + z * z);
+      const newRadius = currentRadius + ridgeNoise * heightNorm;
+      
+      posAttr.setX(i, Math.cos(angle) * newRadius);
+      posAttr.setZ(i, Math.sin(angle) * newRadius);
     }
 
     geo.computeVertexNormals();
@@ -58,7 +71,7 @@ export class TerrainBackdrop {
     const map = texLoader.load('/textures/rock_cliff_diffuse.png');
     map.wrapS = THREE.RepeatWrapping;
     map.wrapT = THREE.RepeatWrapping;
-    map.repeat.set(16, 6); // Rock texture repeat for the large cylinder
+    map.repeat.set(24, 2); // 1:1 aspect ratio to prevent horizontal stretching
     map.colorSpace = THREE.SRGBColorSpace;
 
     // ── Fog color uniform — synced from main.js after HDRI loads ──
