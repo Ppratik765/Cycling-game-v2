@@ -74,12 +74,12 @@ function createGrassTuft() {
 
 /** Layered pine canopy with fluffed normals */
 function createPineCanopy() {
-  const cone1 = new THREE.ConeGeometry(3.6, 6.0, 6, 1);
-  cone1.translate(0, 8.5, 0);
-  const cone2 = new THREE.ConeGeometry(2.6, 4.8, 6, 1);
-  cone2.translate(0, 12.0, 0);
-  const cone3 = new THREE.ConeGeometry(1.6, 3.6, 6, 1);
-  cone3.translate(0, 15.0, 0);
+  const cone1 = new THREE.ConeGeometry(4.5, 7.5, 6, 1);
+  cone1.translate(0, 10.5, 0);
+  const cone2 = new THREE.ConeGeometry(3.2, 6.0, 6, 1);
+  cone2.translate(0, 15.0, 0);
+  const cone3 = new THREE.ConeGeometry(2.0, 4.5, 6, 1);
+  cone3.translate(0, 18.75, 0);
   
   const merged = mergeGeometries([cone1, cone2, cone3]);
   
@@ -99,23 +99,23 @@ function createPineCanopy() {
 
 /** Pine trunk */
 function createPineTrunk() {
-  const trunk = new THREE.CylinderGeometry(0.35, 0.5, 6.5, 5, 1);
-  trunk.translate(0, 3.25, 0);
+  const trunk = new THREE.CylinderGeometry(0.45, 0.65, 8.0, 5, 1);
+  trunk.translate(0, 4.0, 0);
   return trunk;
 }
 
 /** Broadleaf canopy with spherical normals */
 function createBroadleafCanopy() {
-  const canopy = new THREE.IcosahedronGeometry(5.0, 1);
+  const canopy = new THREE.IcosahedronGeometry(6.5, 1);
   canopy.computeVertexNormals();
-  canopy.translate(0, 11.0, 0);
+  canopy.translate(0, 14.0, 0);
   
   // Override normals to be spherical, pointing outward from center (0, 9, 0)
   const pos = canopy.attributes.position.array;
   const norms = canopy.attributes.normal.array;
   for (let i = 0; i < norms.length; i += 3) {
     norms[i] = pos[i];
-    norms[i + 1] = pos[i + 1] - 11.0 + 1.0; // point slightly more upwards (+1.0 offset)
+    norms[i + 1] = pos[i + 1] - 14.0 + 1.0; // point slightly more upwards (+1.0 offset)
     norms[i + 2] = pos[i + 2];
     const len = Math.sqrt(norms[i]**2 + norms[i+1]**2 + norms[i+2]**2);
     norms[i] /= len; norms[i+1] /= len; norms[i+2] /= len;
@@ -126,8 +126,8 @@ function createBroadleafCanopy() {
 
 /** Broadleaf trunk */
 function createBroadleafTrunk() {
-  const trunk = new THREE.CylinderGeometry(0.45, 0.7, 7.5, 5, 1);
-  trunk.translate(0, 3.75, 0);
+  const trunk = new THREE.CylinderGeometry(0.6, 0.9, 9.5, 5, 1);
+  trunk.translate(0, 4.75, 0);
   return trunk;
 }
 
@@ -201,20 +201,7 @@ uniform float uTime;
 `
     );
 
-    // AI Chroma-Key: Discards grey/white/black backgrounds based on raw texture color
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <alphatest_fragment>',
-      `
-      #include <alphatest_fragment>
-      #ifdef USE_MAP
-        vec4 texelColorRaw = texture2D( map, vMapUv );
-        float maxC = max(texelColorRaw.r, max(texelColorRaw.g, texelColorRaw.b));
-        float minC = min(texelColorRaw.r, min(texelColorRaw.g, texelColorRaw.b));
-        if (maxC - minC < 0.05) discard;
-        diffuseColor.a = 1.0;
-      #endif
-      `
-    );
+
   };
 
   mat.customProgramCacheKey = () => 'foliage_grass_textured';
@@ -244,8 +231,8 @@ uniform float uTime;
 `
     );
 
-    const maxH = type === 'pine' ? 18.0 : 16.0;
-    const trunkH = type === 'pine' ? 6.5 : 7.5;
+    const maxH = type === 'pine' ? 22.5 : 20.5;
+    const trunkH = type === 'pine' ? 8.0 : 9.5;
 
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
@@ -265,20 +252,7 @@ uniform float uTime;
 `
     );
 
-    // AI Chroma-Key: Discards grey/white/black backgrounds based on raw texture color
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <alphatest_fragment>',
-      `
-      #include <alphatest_fragment>
-      #ifdef USE_MAP
-        vec4 texelColorRaw = texture2D( map, vMapUv );
-        float maxC = max(texelColorRaw.r, max(texelColorRaw.g, texelColorRaw.b));
-        float minC = min(texelColorRaw.r, min(texelColorRaw.g, texelColorRaw.b));
-        if (maxC - minC < 0.05) discard;
-        diffuseColor.a = 1.0;
-      #endif
-      `
-    );
+
   };
 
   mat.customProgramCacheKey = () => `foliage_leaf_${type}`;
