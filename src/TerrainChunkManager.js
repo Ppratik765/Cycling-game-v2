@@ -58,7 +58,7 @@ export class TerrainChunkManager {
     const cz = Math.round(focusZ / this.chunkSize);
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        await this._createChunk(cx + dx, cz + dz, yieldFn);
+        this._createChunk(cx + dx, cz + dz);
         if (yieldFn) await yieldFn();
       }
     }
@@ -116,7 +116,7 @@ export class TerrainChunkManager {
 
   // ── Internal ────────────────────────────────────────────────
 
-  _createChunk(cx, cz, yieldFn = null) {
+  _createChunk(cx, cz) {
     const size = this.chunkSize;
     const segs = SEGMENTS;
     const verts = segs + 1; // vertices per axis
@@ -192,9 +192,7 @@ export class TerrainChunkManager {
     this.chunks.set(key, { mesh, rigidBody, collider, cx, cz });
 
     // Populate foliage for this chunk
-    if (this.foliage) {
-      return this.foliage.populateChunk(cx, cz, size, yieldFn);
-    }
+    if (this.foliage) this.foliage.populateChunk(cx, cz, size);
   }
 
   /** Move a chunk to the pool instead of destroying it */

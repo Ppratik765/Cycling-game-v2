@@ -8,7 +8,7 @@ import * as THREE from 'three';
 
 // ── Constants ────────────────────────────────────────────────
 
-const GRASS_PER_CHUNK       = 22000;
+const GRASS_PER_CHUNK       = 15000;
 const PINE_PER_CHUNK        = 40;
 const BROADLEAF_PER_CHUNK   = 20;
 
@@ -72,75 +72,66 @@ function createGrassTuft() {
   return merged;
 }
 
-/** Create a cross-quad cluster for photorealistic leaves */
-function createCrossQuad(size, yOffset) {
-  const q1 = new THREE.PlaneGeometry(size, size, 1, 1);
-  const q2 = new THREE.PlaneGeometry(size, size, 1, 1);
-  q2.rotateY(Math.PI / 2);
+/** Layered pine canopy with fluffed normals */
+function createPineCanopy() {
+  const cone1 = new THREE.ConeGeometry(3.0, 5.0, 6, 1);
+  cone1.translate(0, 7.5, 0);
+  const cone2 = new THREE.ConeGeometry(2.2, 4.0, 6, 1);
+  cone2.translate(0, 10.5, 0);
+  const cone3 = new THREE.ConeGeometry(1.4, 3.0, 6, 1);
+  cone3.translate(0, 13.0, 0);
   
-  const merged = mergeGeometries([q1, q2]);
-  merged.translate(0, yOffset, 0);
+  const merged = mergeGeometries([cone1, cone2, cone3]);
   
-  // Spherize normals for volumetric shading
+  // Bend normals outwards and upwards to create soft, fluffy volumetric shading
   const pos = merged.attributes.position.array;
   const norms = merged.attributes.normal.array;
   for (let i = 0; i < norms.length; i += 3) {
-    norms[i] = pos[i];
-    norms[i + 1] = Math.abs(pos[i + 1] - yOffset) + (size * 0.5); // Bias upward
-    norms[i + 2] = pos[i + 2];
-    const len = Math.sqrt(norms[i] ** 2 + norms[i + 1] ** 2 + norms[i + 2] ** 2) || 1;
-    norms[i] /= len; norms[i + 1] /= len; norms[i + 2] /= len;
+    norms[i] = pos[i] * 0.6;
+    norms[i + 1] = 1.0; 
+    norms[i + 2] = pos[i + 2] * 0.6;
+    const len = Math.sqrt(norms[i]**2 + norms[i+1]**2 + norms[i+2]**2);
+    norms[i] /= len; norms[i+1] /= len; norms[i+2] /= len;
   }
+  
   return merged;
 }
 
-/** Pine canopy — stacked cross-quads */
-function createPineCanopy() {
-  const layers = [
-    createCrossQuad(10.0, 7.0),
-    createCrossQuad(8.5, 10.5),
-    createCrossQuad(7.0, 14.0),
-    createCrossQuad(5.0, 17.0)
-  ];
-  return mergeGeometries(layers);
-}
-
-/** Pine trunk — thick, tall cylinder */
+/** Pine trunk */
 function createPineTrunk() {
-  const trunk = new THREE.CylinderGeometry(0.45, 0.7, 12.0, 6, 1);
-  trunk.translate(0, 6.0, 0);
+  const trunk = new THREE.CylinderGeometry(0.25, 0.35, 5.0, 5, 1);
+  trunk.translate(0, 2.5, 0);
   return trunk;
 }
 
-/** Broadleaf canopy — clustered cross-quads */
+/** Broadleaf canopy with spherical normals */
 function createBroadleafCanopy() {
-  const q1 = createCrossQuad(12.0, 10.0);
+  const canopy = new THREE.IcosahedronGeometry(4.0, 1);
+  canopy.computeVertexNormals();
+  canopy.translate(0, 9.0, 0);
   
-  const q2 = createCrossQuad(10.0, 11.0);
-  q2.translate(3.0, 0, 0);
+  // Override normals to be spherical, pointing outward from center (0, 9, 0)
+  const pos = canopy.attributes.position.array;
+  const norms = canopy.attributes.normal.array;
+  for (let i = 0; i < norms.length; i += 3) {
+    norms[i] = pos[i];
+    norms[i + 1] = pos[i + 1] - 9.0 + 1.0; // point slightly more upwards (+1.0 offset)
+    norms[i + 2] = pos[i + 2];
+    const len = Math.sqrt(norms[i]**2 + norms[i+1]**2 + norms[i+2]**2);
+    norms[i] /= len; norms[i+1] /= len; norms[i+2] /= len;
+  }
   
-  const q3 = createCrossQuad(10.0, 11.0);
-  q3.translate(-3.0, 0, 0);
-  
-  const q4 = createCrossQuad(10.0, 11.0);
-  q4.translate(0, 0, 3.0);
-  
-  const q5 = createCrossQuad(10.0, 11.0);
-  q5.translate(0, 0, -3.0);
-  
-  const q6 = createCrossQuad(10.0, 14.0);
-  
-  return mergeGeometries([q1, q2, q3, q4, q5, q6]);
+  return canopy;
 }
 
-/** Broadleaf trunk — thick cylinder */
+/** Broadleaf trunk */
 function createBroadleafTrunk() {
-  const trunk = new THREE.CylinderGeometry(0.6, 1.0, 8.0, 6, 1);
-  trunk.translate(0, 4.0, 0);
+  const trunk = new THREE.CylinderGeometry(0.3, 0.5, 6.0, 5, 1);
+  trunk.translate(0, 3.0, 0);
   return trunk;
 }
 
-/** Simple geometry merge with UV support */
+/** Simple geometry merge */
 function mergeGeometries(geos) {
   let totalVerts = 0;
   for (const g of geos) {
@@ -149,19 +140,14 @@ function mergeGeometries(geos) {
   }
   const pos = new Float32Array(totalVerts * 3);
   const norm = new Float32Array(totalVerts * 3);
-  const uvs = new Float32Array(totalVerts * 2);
   const idx = [];
   let vOff = 0;
   for (const g of geos) {
     const p = g.attributes.position.array;
     const n = g.attributes.normal ? g.attributes.normal.array : new Float32Array(p.length);
-    const u = g.attributes.uv ? g.attributes.uv.array : new Float32Array((p.length / 3) * 2);
     for (let i = 0; i < p.length; i++) {
       pos[vOff * 3 + i] = p[i];
       norm[vOff * 3 + i] = n[i];
-    }
-    for (let i = 0; i < u.length; i++) {
-      uvs[vOff * 2 + i] = u[i];
     }
     if (g.index) {
       for (let i = 0; i < g.index.count; i++) idx.push(g.index.array[i] + vOff);
@@ -171,7 +157,6 @@ function mergeGeometries(geos) {
   const merged = new THREE.BufferGeometry();
   merged.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   merged.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
-  merged.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   merged.setIndex(idx);
   merged.computeVertexNormals();
   return merged;
@@ -264,21 +249,6 @@ uniform float uTime;
   transformed.z += macroZ + microZ;
 `
     );
-
-    // AI generated textures often bake a solid black background instead of true alpha.
-    // We dynamically calculate luminance and force alpha to 0 for black pixels.
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <map_fragment>',
-      `
-      #include <map_fragment>
-      #ifdef USE_MAP
-        float luma = dot(texelColor.rgb, vec3(0.299, 0.587, 0.114));
-        if (luma < 0.15) {
-          diffuseColor.a = 0.0;
-        }
-      #endif
-      `
-    );
   };
 
   mat.customProgramCacheKey = () => `foliage_leaf_${type}`;
@@ -317,8 +287,8 @@ export class FoliageSystem {
 
     // Shared materials
     this._grassMat      = createGrassMaterial(this.uTime);
-    this._pineLeafMat   = createLeafMaterial(0xffffff, 'pine', this.uTime);
-    this._broadLeafMat  = createLeafMaterial(0xffffff, 'broadleaf', this.uTime);
+    this._pineLeafMat   = createLeafMaterial(0x3a6630, 'pine', this.uTime);    // Desaturated pine green
+    this._broadLeafMat  = createLeafMaterial(0x4a7a3a, 'broadleaf', this.uTime); // Desaturated broadleaf
     this._trunkMat      = createTrunkMaterial();
 
     this.chunkFoliage = new Map();
@@ -335,7 +305,7 @@ export class FoliageSystem {
     this.uTime.value = elapsedTime;
   }
 
-  async populateChunk(cx, cz, chunkSize, yieldFn = null) {
+  populateChunk(cx, cz, chunkSize) {
     const key = `${cx},${cz}`;
     this.removeChunk(key);
 
@@ -358,8 +328,6 @@ export class FoliageSystem {
 
     // ── Grass pass ────────────────────────────────────────────
     for (let i = 0; i < GRASS_PER_CHUNK; i++) {
-      // Yield to UI periodically during this massive loop to prevent animation stuttering
-      if (yieldFn && i > 0 && i % 4000 === 0) await yieldFn();
       const localX = (rng() - 0.5) * chunkSize;
       const localZ = (rng() - 0.5) * chunkSize;
       const worldX = localX + worldOriginX;
