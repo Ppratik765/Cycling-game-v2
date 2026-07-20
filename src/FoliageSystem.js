@@ -72,121 +72,62 @@ function createGrassTuft() {
   return merged;
 }
 
-/** Generate highly realistic branching procedural trees */
-function createProceduralTree(type) {
-  const trunks = [];
-  const leaves = [];
-  // Deterministic seed so the tree is the same every time it's instanced
-  const rng = mulberry32(type === 'pine' ? 888 : 999); 
-
-  if (type === 'pine') {
-    const trunkH = 16.0;
-    const trunkGeo = new THREE.CylinderGeometry(0.35, 0.6, trunkH, 6, 1);
-    trunkGeo.translate(0, trunkH / 2, 0);
-    trunks.push(trunkGeo);
-
-    const numWhorls = 7;
-    for (let i = 0; i < numWhorls; i++) {
-      const h = 3.0 + i * 1.8;
-      const radius = (17.0 - h) * 0.4;
-      const numBranches = 4 + Math.floor(rng() * 2);
-      const angleOffset = rng() * Math.PI;
-
-      for (let j = 0; j < numBranches; j++) {
-        const angle = angleOffset + (j / numBranches) * Math.PI * 2;
-        const branchL = radius * (0.8 + rng() * 0.4);
-        
-        const branch = new THREE.CylinderGeometry(0.05, 0.15, branchL, 4, 1);
-        branch.rotateX(Math.PI / 2);
-        branch.rotateX(-0.1); // slight droop
-        branch.translate(0, 0, branchL / 2);
-        branch.rotateY(angle);
-        branch.translate(0, h, 0);
-        trunks.push(branch);
-
-        // Leaf clusters at branch ends
-        const leafSize = branchL * 1.5;
-        const leaf = new THREE.PlaneGeometry(leafSize, leafSize, 1, 1);
-        for (let k = 0; k < 3; k++) {
-          const l = leaf.clone();
-          l.rotateY((Math.PI / 3) * k + rng() * 0.2);
-          l.rotateX((rng() - 0.5) * 0.5);
-          l.translate(
-            Math.sin(angle) * branchL,
-            h + 0.2,
-            Math.cos(angle) * branchL
-          );
-          leaves.push(l);
-        }
-      }
-    }
-  } else {
-    // Broadleaf
-    const trunkH = 6.0;
-    const trunkGeo = new THREE.CylinderGeometry(0.4, 0.7, trunkH, 6, 1);
-    trunkGeo.translate(0, trunkH / 2, 0);
-    trunks.push(trunkGeo);
-
-    const numBoughs = 4;
-    for (let i = 0; i < numBoughs; i++) {
-      const angle = (i / numBoughs) * Math.PI * 2 + (rng() - 0.5);
-      const boughL = 6.0 + rng() * 3.0;
-      
-      const bough = new THREE.CylinderGeometry(0.15, 0.35, boughL, 5, 1);
-      bough.translate(0, boughL / 2, 0);
-      bough.rotateZ(0.6 + rng() * 0.2);
-      bough.rotateY(angle);
-      bough.translate(0, trunkH - 0.5, 0);
-      trunks.push(bough);
-
-      const mat = new THREE.Matrix4();
-      mat.makeRotationY(angle);
-      mat.multiply(new THREE.Matrix4().makeRotationZ(0.7));
-      mat.multiply(new THREE.Matrix4().makeTranslation(0, boughL, 0));
-      
-      const boughEnd = new THREE.Vector3(0,0,0).applyMatrix4(mat);
-      boughEnd.y += trunkH - 0.5;
-
-      for(let j = 0; j < 8; j++) {
-        const leafSize = 6.0 + rng() * 3.0;
-        const l = new THREE.PlaneGeometry(leafSize, leafSize, 1, 1);
-        l.rotateY(rng() * Math.PI);
-        l.rotateX(rng() * Math.PI);
-        l.translate(
-          boughEnd.x + (rng() - 0.5) * 4.0,
-          boughEnd.y + (rng() - 0.5) * 4.0,
-          boughEnd.z + (rng() - 0.5) * 4.0
-        );
-        leaves.push(l);
-      }
-    }
-    
-    // Crown cluster
-    for(let j = 0; j < 6; j++) {
-      const leafSize = 8.0;
-      const l = new THREE.PlaneGeometry(leafSize, leafSize, 1, 1);
-      l.rotateY(rng() * Math.PI);
-      l.rotateX(rng() * Math.PI);
-      l.translate((rng() - 0.5) * 2.0, trunkH + 5.0 + (rng() - 0.5) * 3.0, (rng() - 0.5) * 2.0);
-      leaves.push(l);
-    }
+/** Layered pine canopy — 4 stacked cones for a proper conifer silhouette */
+function createPineCanopy() {
+  const cones = [];
+  const layers = [  // [radius, height, yCenter]
+    [5.0, 6.0, 10.0],
+    [4.0, 5.5, 13.5],
+    [3.0, 5.0, 16.5],
+    [2.0, 4.0, 19.0],
+  ];
+  for (const [r, h, y] of layers) {
+    const cone = new THREE.ConeGeometry(r, h, 7, 1);
+    cone.translate(0, y, 0);
+    cones.push(cone);
   }
+  const merged = mergeGeometries(cones);
+  // Soften normals upward for volumetric look
+  const norms = merged.attributes.normal.array;
+  for (let i = 0; i < norms.length; i += 3) {
+    norms[i] *= 0.5;
+    norms[i + 1] = Math.abs(norms[i + 1]) * 0.5 + 0.5;
+    norms[i + 2] *= 0.5;
+    const len = Math.sqrt(norms[i] ** 2 + norms[i + 1] ** 2 + norms[i + 2] ** 2) || 1;
+    norms[i] /= len; norms[i + 1] /= len; norms[i + 2] /= len;
+  }
+  return merged;
+}
 
-  const mergedTrunks = mergeGeometries(trunks);
-  const mergedLeaves = mergeGeometries(leaves);
-  
-  // Fluff leaf normals for volumetric shading
-  const pos = mergedLeaves.attributes.position.array;
-  const norms = mergedLeaves.attributes.normal.array;
+/** Pine trunk — thick, tall cylinder */
+function createPineTrunk() {
+  const trunk = new THREE.CylinderGeometry(0.4, 0.65, 10.0, 6, 1);
+  trunk.translate(0, 5.0, 0);
+  return trunk;
+}
+
+/** Broadleaf canopy — icosahedron for a round, fluffy shape */
+function createBroadleafCanopy() {
+  const canopy = new THREE.IcosahedronGeometry(6.5, 1);
+  canopy.translate(0, 14.0, 0);
+  // Soften normals for smooth volumetric shading
+  const pos = canopy.attributes.position.array;
+  const norms = canopy.attributes.normal.array;
   for (let i = 0; i < norms.length; i += 3) {
     norms[i] = pos[i];
-    norms[i + 1] = (pos[i + 1] - 8.0) * 0.5 + 2.0; 
+    norms[i + 1] = (pos[i + 1] - 14.0) + 2.0; // bias upward
     norms[i + 2] = pos[i + 2];
-    const len = Math.sqrt(norms[i]**2 + norms[i+1]**2 + norms[i+2]**2) || 1;
-    norms[i] /= len; norms[i+1] /= len; norms[i+2] /= len;
+    const len = Math.sqrt(norms[i] ** 2 + norms[i + 1] ** 2 + norms[i + 2] ** 2) || 1;
+    norms[i] /= len; norms[i + 1] /= len; norms[i + 2] /= len;
   }
+  return canopy;
+}
 
-  return { trunkGeo: mergedTrunks, canopyGeo: mergedLeaves };
+/** Broadleaf trunk — thick cylinder */
+function createBroadleafTrunk() {
+  const trunk = new THREE.CylinderGeometry(0.5, 0.8, 9.0, 6, 1);
+  trunk.translate(0, 4.5, 0);
+  return trunk;
 }
 
 /** Simple geometry merge with UV support */
@@ -343,16 +284,11 @@ export class FoliageSystem {
     this.uTime = { value: 0.0 };
 
     // Shared geometries
-    // Procedural geometries
-    this._grassGeo = createGrassTuft();
-    
-    const pine = createProceduralTree('pine');
-    this._pineCanopyGeo = pine.canopyGeo;
-    this._pineTrunkGeo = pine.trunkGeo;
-    
-    const broad = createProceduralTree('broadleaf');
-    this._broadCanopyGeo = broad.canopyGeo;
-    this._broadTrunkGeo = broad.trunkGeo;
+    this._grassGeo       = createGrassTuft();
+    this._pineCanopyGeo  = createPineCanopy();
+    this._pineTrunkGeo   = createPineTrunk();
+    this._broadCanopyGeo = createBroadleafCanopy();
+    this._broadTrunkGeo  = createBroadleafTrunk();
 
     // Shared materials
     this._grassMat      = createGrassMaterial(this.uTime);
