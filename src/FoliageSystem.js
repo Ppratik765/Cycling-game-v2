@@ -172,7 +172,6 @@ function createGrassMaterial(uTimeRef) {
     color: 0x4a6340, // Desaturated olive — less vivid under ACES tonemapping
     map: grassTex,
     alphaTest: 0.5,
-    alphaToCoverage: true, // Eliminates distant foliage noise/shimmering (requires antialias: true on WebGLRenderer)
     roughness: 0.9,
     metalness: 0.0,
     side: THREE.DoubleSide,
@@ -215,7 +214,6 @@ function createLeafMaterial(baseColor, type, uTimeRef) {
     color: baseColor,
     map: leafTex,
     alphaTest: 0.35,
-    alphaToCoverage: true, // Eliminates distant foliage noise
     roughness: 0.8,
     metalness: 0.0,
     side: THREE.DoubleSide,

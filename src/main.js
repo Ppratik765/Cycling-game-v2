@@ -173,11 +173,9 @@ async function init() {
       luminanceInfluence: 0.6,
     });
     const vignetteEffect = new VignetteEffect({ darkness: 0.4, offset: 0.3 });
-    const noiseEffect = new NoiseEffect({ blendFunction: BlendFunction.OVERLAY });
-    noiseEffect.blendMode.opacity.value = 0.025;
     const smaaEffect = new SMAAEffect();
 
-    const effectPass = new EffectPass(camera, ssaoEffect, vignetteEffect, noiseEffect, smaaEffect);
+    const effectPass = new EffectPass(camera, ssaoEffect, vignetteEffect, smaaEffect);
     composer.addPass(effectPass);
 
     // ── Splat Material ────────────────────────────────────────
