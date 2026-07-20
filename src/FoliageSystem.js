@@ -328,6 +328,110 @@ export class FoliageSystem {
     this.uTime.value = elapsedTime;
   }
 
+  async populateChunkAsync(cx, cz, chunkSize) {
+    const key = `${cx},${cz}`;
+    this.removeChunk(key);
+
+    const worldOriginX = cx * chunkSize;
+    const worldOriginZ = cz * chunkSize;
+    const rng = mulberry32(chunkSeed(cx, cz));
+
+    // Pre-allocate buffers for massive performance gains
+    const grassBuffer = new Float32Array(GRASS_PER_CHUNK * 16);
+    const grassColors = new Float32Array(GRASS_PER_CHUNK * 3);
+    const pineBuffer = new Float32Array(PINE_PER_CHUNK * 16);
+    const broadBuffer = new Float32Array(BROADLEAF_PER_CHUNK * 16);
+
+    let grassCount = 0;
+    let pineCount = 0;
+    let broadCount = 0;
+
+    const _grassColor = new THREE.Color();
+
+    // ── Grass pass ────────────────────────────────────────────
+    for (let i = 0; i < GRASS_PER_CHUNK; i++) {
+      const localX = (rng() - 0.5) * chunkSize;
+      const localZ = (rng() - 0.5) * chunkSize;
+      const worldX = localX + worldOriginX;
+      const worldZ = localZ + worldOriginZ;
+      const dist = distToTrail(worldX, worldZ);
+      if (dist < TRAIL_CLEAR) continue;
+      
+      const height = this.noiseGen.getHeight(worldX, worldZ);
+      const yRot = rng() * Math.PI * 2;
+      const s = 0.8 + rng() * 0.6;
+      this._mat4.compose(
+        this._pos.set(worldX, height, worldZ),
+        this._quat.setFromAxisAngle(this._up, yRot),
+        this._scale.set(s, s + rng() * 0.5, s)
+      );
+      this._mat4.toArray(grassBuffer, grassCount * 16);
+
+      const hue = 0.25 + rng() * 0.08;
+      const sat = 0.25 + rng() * 0.25;
+      const lightness = 0.18 + rng() * 0.14;
+      _grassColor.setHSL(hue, sat, lightness);
+      grassColors[grassCount * 3]     = _grassColor.r;
+      grassColors[grassCount * 3 + 1] = _grassColor.g;
+      grassColors[grassCount * 3 + 2] = _grassColor.b;
+
+      grassCount++;
+      
+      // Yield every 4000 instances to prevent main thread blocking (frame drops)
+      if (i % 4000 === 0 && i !== 0) {
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    // ── Pine trees ────────────────────────────────────────────
+    for (let i = 0; i < PINE_PER_CHUNK; i++) {
+      const localX = (rng() - 0.5) * chunkSize;
+      const localZ = (rng() - 0.5) * chunkSize;
+      const worldX = localX + worldOriginX;
+      const worldZ = localZ + worldOriginZ;
+      const dist = distToTrail(worldX, worldZ);
+      if (dist < TRAIL_DENSE) continue;
+      const height = this.noiseGen.getHeight(worldX, worldZ);
+      const yRot = rng() * Math.PI * 2;
+      const s = 0.45 + rng() * 0.35;
+      this._mat4.compose(
+        this._pos.set(worldX, height, worldZ),
+        this._quat.setFromAxisAngle(this._up, yRot),
+        this._scale.set(s, s, s)
+      );
+      this._mat4.toArray(pineBuffer, pineCount * 16);
+      pineCount++;
+    }
+    
+    await new Promise(r => setTimeout(r, 0));
+
+    // ── Broadleaf trees ───────────────────────────────────────
+    for (let i = 0; i < BROADLEAF_PER_CHUNK; i++) {
+      const localX = (rng() - 0.5) * chunkSize;
+      const localZ = (rng() - 0.5) * chunkSize;
+      const worldX = localX + worldOriginX;
+      const worldZ = localZ + worldOriginZ;
+      const dist = distToTrail(worldX, worldZ);
+      if (dist < TRAIL_DENSE) continue;
+      const height = this.noiseGen.getHeight(worldX, worldZ);
+      const yRot = rng() * Math.PI * 2;
+      const s = 0.4 + rng() * 0.35;
+      this._mat4.compose(
+        this._pos.set(worldX, height, worldZ),
+        this._quat.setFromAxisAngle(this._up, yRot),
+        this._scale.set(s, s, s)
+      );
+      this._mat4.toArray(broadBuffer, broadCount * 16);
+      broadCount++;
+    }
+    
+    await new Promise(r => setTimeout(r, 0));
+
+    this._createInstancedMeshes(cx, cz, entry => {
+      this.chunkFoliage.set(key, entry);
+    }, grassCount, pineCount, broadCount, grassBuffer, grassColors, pineBuffer, broadBuffer);
+  }
+
   populateChunk(cx, cz, chunkSize) {
     const key = `${cx},${cz}`;
     this.removeChunk(key);
@@ -419,7 +523,12 @@ export class FoliageSystem {
       broadCount++;
     }
 
-    // ── Create InstancedMeshes ────────────────────────────────
+    this._createInstancedMeshes(cx, cz, entry => {
+      this.chunkFoliage.set(key, entry);
+    }, grassCount, pineCount, broadCount, grassBuffer, grassColors, pineBuffer, broadBuffer);
+  }
+
+  _createInstancedMeshes(cx, cz, saveEntry, grassCount, pineCount, broadCount, grassBuffer, grassColors, pineBuffer, broadBuffer) {
     const entry = {};
     const addIM = (geo, mat, buffer, count, name, castShadow, colors) => {
       if (count === 0) return;

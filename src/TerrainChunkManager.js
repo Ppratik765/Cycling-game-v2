@@ -31,6 +31,8 @@ export class TerrainChunkManager {
 
     /** Map of "cx,cz" → { mesh, rigidBody, collider, cx, cz } */
     this.chunks = new Map();
+    /** Set of chunks currently being generated to prevent duplicates */
+    this.chunksInProgress = new Set();
     /** Pool of disposed chunk objects ready for reuse */
     this._pool = [];
     this._lastCX = Infinity;
@@ -72,11 +74,20 @@ export class TerrainChunkManager {
    */
   update(focusX, focusZ) {
     // Process one chunk from the queue per frame to prevent massive FPS spikes
+    // We only pop from the queue if there's no chunk actively being generated for that key
     if (this.chunkQueue && this.chunkQueue.length > 0) {
-      const nextKey = this.chunkQueue.shift();
-      if (!this.chunks.has(nextKey)) {
+      const nextKey = this.chunkQueue[0]; // Peek at next
+      if (!this.chunks.has(nextKey) && !this.chunksInProgress.has(nextKey)) {
+        this.chunkQueue.shift(); // Consume it
+        this.chunksInProgress.add(nextKey);
+        
         const [ncx, ncz] = nextKey.split(',').map(Number);
-        this._createChunk(ncx, ncz);
+        this._createChunkAsync(ncx, ncz, nextKey).catch(console.error).finally(() => {
+          this.chunksInProgress.delete(nextKey);
+        });
+      } else if (this.chunks.has(nextKey)) {
+        // Already exists, just discard from queue
+        this.chunkQueue.shift();
       }
     }
 
@@ -116,7 +127,7 @@ export class TerrainChunkManager {
 
   // ── Internal ────────────────────────────────────────────────
 
-  _createChunk(cx, cz) {
+  async _createChunkAsync(cx, cz, key) {
     const size = this.chunkSize;
     const segs = SEGMENTS;
     const verts = segs + 1; // vertices per axis
@@ -169,6 +180,9 @@ export class TerrainChunkManager {
     posAttr.needsUpdate = true;
 
     mesh.position.set(worldOriginX, 0, worldOriginZ);
+    
+    // Yield to browser to maintain high FPS
+    await new Promise(r => setTimeout(r, 0));
 
     // ── Rapier3D Heightfield ───────────────────────────────────
     const R = this.RAPIER;
@@ -191,8 +205,15 @@ export class TerrainChunkManager {
     const key = `${cx},${cz}`;
     this.chunks.set(key, { mesh, rigidBody, collider, cx, cz });
 
-    // Populate foliage for this chunk
-    if (this.foliage) this.foliage.populateChunk(cx, cz, size);
+    // Yield to browser before foliage generation
+    await new Promise(r => setTimeout(r, 0));
+
+    // Populate foliage for this chunk asynchronously
+    if (this.foliage && this.foliage.populateChunkAsync) {
+      await this.foliage.populateChunkAsync(cx, cz, size);
+    } else if (this.foliage) {
+      this.foliage.populateChunk(cx, cz, size);
+    }
   }
 
   /** Move a chunk to the pool instead of destroying it */
