@@ -94,10 +94,10 @@ function createPineCanopy() {
   };
 
   // Stack 4 layers of decreasing size to form a pine profile
-  addLayer(9.0, 9.5, 7.0, 0);
-  addLayer(13.0, 7.5, 6.0, 0.5);
-  addLayer(17.0, 5.5, 5.0, 1.0);
-  addLayer(20.5, 3.5, 4.0, 1.5);
+  addLayer(13.0, 9.5, 7.0, 0);
+  addLayer(17.0, 7.5, 6.0, 0.5);
+  addLayer(21.0, 5.5, 5.0, 1.0);
+  addLayer(24.5, 3.5, 4.0, 1.5);
   
   const merged = mergeGeometries(planes);
   
@@ -117,8 +117,8 @@ function createPineCanopy() {
 
 /** Pine trunk */
 function createPineTrunk() {
-  const trunk = new THREE.CylinderGeometry(0.45, 0.65, 8.0, 5, 1);
-  trunk.translate(0, 4.0, 0);
+  const trunk = new THREE.CylinderGeometry(0.7, 0.95, 12.0, 5, 1);
+  trunk.translate(0, 6.0, 0);
   return trunk;
 }
 
@@ -141,17 +141,17 @@ function createBroadleafCanopy() {
   };
 
   // Central core
-  addCluster(0, 14.0, 0, 13.0, 0);
+  addCluster(0, 18.5, 0, 13.0, 0);
   
   // Surrounding fluffy clusters
   const r = 4.0;
-  addCluster(r, 13.0, 0, 9.0, 0.5);
-  addCluster(-r, 13.0, 0, 9.0, 1.0);
-  addCluster(0, 13.0, r, 9.0, 1.5);
-  addCluster(0, 13.0, -r, 9.0, 2.0);
+  addCluster(r, 17.5, 0, 9.0, 0.5);
+  addCluster(-r, 17.5, 0, 9.0, 1.0);
+  addCluster(0, 17.5, r, 9.0, 1.5);
+  addCluster(0, 17.5, -r, 9.0, 2.0);
   
   // Top cluster
-  addCluster(0, 18.0, 0, 10.0, 2.5);
+  addCluster(0, 22.5, 0, 10.0, 2.5);
   
   const merged = mergeGeometries(planes);
   
@@ -160,7 +160,7 @@ function createBroadleafCanopy() {
   const norms = merged.attributes.normal.array;
   for (let i = 0; i < norms.length; i += 3) {
     norms[i] = pos[i];
-    norms[i + 1] = pos[i + 1] - 14.0 + 1.0; // point slightly more upwards (+1.0 offset)
+    norms[i + 1] = pos[i + 1] - 18.5 + 1.0; // point slightly more upwards (+1.0 offset)
     norms[i + 2] = pos[i + 2];
     const len = Math.sqrt(norms[i]**2 + norms[i+1]**2 + norms[i+2]**2);
     norms[i] /= len; norms[i+1] /= len; norms[i+2] /= len;
@@ -171,8 +171,8 @@ function createBroadleafCanopy() {
 
 /** Broadleaf trunk */
 function createBroadleafTrunk() {
-  const trunk = new THREE.CylinderGeometry(0.6, 0.9, 9.5, 5, 1);
-  trunk.translate(0, 4.75, 0);
+  const trunk = new THREE.CylinderGeometry(0.9, 1.3, 14.0, 5, 1);
+  trunk.translate(0, 7.0, 0);
   return trunk;
 }
 
