@@ -59,8 +59,23 @@ html, body {
 /* --- SVG Cyclist --- */
 #cyclist-svg {
   width: min(500px, 80vw);
+  max-height: 40vh; /* Prevent overflowing off-screen on short landscape phones */
   height: auto;
   margin-bottom: 1rem;
+}
+
+@media (orientation: portrait) {
+  #cyclist-svg {
+    width: 90vw;
+    margin-bottom: 2rem;
+  }
+  #loading-progress-wrapper {
+    width: 85vw;
+  }
+  #loading-status {
+    font-size: 1.1rem;
+    margin-top: 1rem;
+  }
 }
 
 /* Wheel spin animation */
