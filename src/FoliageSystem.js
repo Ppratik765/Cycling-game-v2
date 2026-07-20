@@ -128,8 +128,13 @@ function mergeGeometries(geos) {
 // ── Wind material factory ────────────────────────────────────
 
 function createGrassMaterial(uTimeRef) {
+  const grassTex = new THREE.TextureLoader().load('/textures/grass_blade_alpha.png');
+  grassTex.colorSpace = THREE.SRGBColorSpace;
+
   const mat = new THREE.MeshStandardMaterial({
-    color: 0x2d5a27, // A realistic, lush green
+    color: 0x4a6340, // Desaturated olive — less vivid under ACES tonemapping
+    map: grassTex,
+    alphaTest: 0.5,
     roughness: 0.9,
     metalness: 0.0,
     side: THREE.DoubleSide,
@@ -256,12 +261,16 @@ export class FoliageSystem {
 
     // Pre-allocate buffers for massive performance gains (no GC hit from Matrix4 cloning)
     const grassBuffer = new Float32Array(GRASS_PER_CHUNK * 16);
+    const grassColors = new Float32Array(GRASS_PER_CHUNK * 3); // Per-instance color variation
     const pineBuffer = new Float32Array(PINE_PER_CHUNK * 16);
     const broadBuffer = new Float32Array(BROADLEAF_PER_CHUNK * 16);
 
     let grassCount = 0;
     let pineCount = 0;
     let broadCount = 0;
+
+    // Color palette for grass variation (olive → deeper green, desaturated)
+    const _grassColor = new THREE.Color();
 
     // ── Grass pass ────────────────────────────────────────────
     for (let i = 0; i < GRASS_PER_CHUNK; i++) {
@@ -280,6 +289,16 @@ export class FoliageSystem {
         this._scale.set(s, s + rng() * 0.5, s)
       );
       this._mat4.toArray(grassBuffer, grassCount * 16);
+
+      // Per-instance color: random tint between olive and deeper green
+      const hue = 0.25 + rng() * 0.08;          // 90°–119° (olive → green)
+      const sat = 0.25 + rng() * 0.25;           // Desaturated: 25%–50%
+      const lightness = 0.18 + rng() * 0.14;     // Dark: 18%–32%
+      _grassColor.setHSL(hue, sat, lightness);
+      grassColors[grassCount * 3]     = _grassColor.r;
+      grassColors[grassCount * 3 + 1] = _grassColor.g;
+      grassColors[grassCount * 3 + 2] = _grassColor.b;
+
       grassCount++;
     }
 
@@ -325,12 +344,18 @@ export class FoliageSystem {
 
     // ── Create InstancedMeshes ────────────────────────────────
     const entry = {};
-    const addIM = (geo, mat, buffer, count, name, castShadow) => {
+    const addIM = (geo, mat, buffer, count, name, castShadow, colors) => {
       if (count === 0) return;
       const m = new THREE.InstancedMesh(geo, mat, count);
       // Copy the pre-allocated float32 array directly into the instanceMatrix attribute
       m.instanceMatrix.array.set(buffer.subarray(0, count * 16));
       m.instanceMatrix.needsUpdate = true;
+      // Apply per-instance color if provided
+      if (colors) {
+        m.instanceColor = new THREE.InstancedBufferAttribute(
+          new Float32Array(colors.subarray(0, count * 3)), 3
+        );
+      }
       m.castShadow = castShadow;
       m.receiveShadow = false;
       m.frustumCulled = false;
@@ -338,7 +363,7 @@ export class FoliageSystem {
       entry[name] = m;
     };
 
-    addIM(this._grassGeo,       this._grassMat,     grassBuffer, grassCount, 'grass',        false);
+    addIM(this._grassGeo,       this._grassMat,     grassBuffer, grassCount, 'grass',        false, grassColors);
     addIM(this._pineCanopyGeo,  this._pineLeafMat,  pineBuffer,  pineCount,  'pineCanopy',   true);
     addIM(this._pineTrunkGeo,   this._trunkMat,     pineBuffer,  pineCount,  'pineTrunk',    true);
     addIM(this._broadCanopyGeo, this._broadLeafMat, broadBuffer, broadCount, 'broadCanopy',  true);
