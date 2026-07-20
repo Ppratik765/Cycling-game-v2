@@ -555,7 +555,7 @@ export class FoliageSystem {
     addIM(this._broadCanopyGeo, this._broadLeafMat, broadBuffer, broadCount, 'broadCanopy',  true);
     addIM(this._broadTrunkGeo,  this._trunkMat,     broadBuffer, broadCount, 'broadTrunk',   true);
 
-    this.chunkFoliage.set(key, entry);
+    saveEntry(entry);
   }
 
   removeChunk(key) {
