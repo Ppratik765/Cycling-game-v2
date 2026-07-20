@@ -46,7 +46,12 @@ export class TerrainChunkManager {
     const cz = Math.round(focusZ / this.chunkSize);
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        this._createChunk(cx + dx, cz + dz);
+        const ncx = cx + dx, ncz = cz + dz;
+        const key = `${ncx},${ncz}`;
+        this.chunksInProgress.add(key);
+        this._createChunkAsync(ncx, ncz, key).catch(console.error).finally(() => {
+          this.chunksInProgress.delete(key);
+        });
       }
     }
     this._lastCX = cx;
@@ -60,7 +65,11 @@ export class TerrainChunkManager {
     const cz = Math.round(focusZ / this.chunkSize);
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        this._createChunk(cx + dx, cz + dz);
+        const ncx = cx + dx, ncz = cz + dz;
+        const key = `${ncx},${ncz}`;
+        this.chunksInProgress.add(key);
+        await this._createChunkAsync(ncx, ncz, key);
+        this.chunksInProgress.delete(key);
         if (yieldFn) await yieldFn();
       }
     }
