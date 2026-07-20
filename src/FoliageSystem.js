@@ -201,15 +201,7 @@ uniform float uTime;
 `
     );
 
-    // Auto-remove black or white backgrounds from AI generated images
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <alphatest_fragment>',
-      `
-      #include <alphatest_fragment>
-      float luma = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-      if (luma < 0.1 || luma > 0.95) discard;
-      `
-    );
+
   };
 
   mat.customProgramCacheKey = () => 'foliage_grass_textured';
@@ -260,15 +252,7 @@ uniform float uTime;
 `
     );
 
-    // Auto-remove black or white backgrounds from AI generated images
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <alphatest_fragment>',
-      `
-      #include <alphatest_fragment>
-      float luma = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-      if (luma < 0.1 || luma > 0.95) discard;
-      `
-    );
+
   };
 
   mat.customProgramCacheKey = () => `foliage_leaf_${type}`;
