@@ -16,6 +16,9 @@ html, body {
   overflow: hidden;
   background: #000;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 #app {
