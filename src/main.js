@@ -235,7 +235,11 @@ async function init() {
     // ── Step 5: Compile shaders ───────────────────────────────
     progress.startStep(stepShaders);
     await LoadingProgress.yieldToUI();
-    renderer.compile(scene, camera);
+    if (renderer.compileAsync) {
+      await renderer.compileAsync(scene, camera);
+    } else {
+      renderer.compile(scene, camera);
+    }
     progress.completeStep(stepShaders);
 
     // ── Step 6: Finalize ──────────────────────────────────────
