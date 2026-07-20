@@ -8,7 +8,7 @@ import * as THREE from 'three';
 
 // ── Constants ────────────────────────────────────────────────
 
-const GRASS_PER_CHUNK       = 15000;
+const GRASS_PER_CHUNK       = 20000;
 const PINE_PER_CHUNK        = 40;
 const BROADLEAF_PER_CHUNK   = 20;
 
@@ -74,12 +74,12 @@ function createGrassTuft() {
 
 /** Layered pine canopy with fluffed normals */
 function createPineCanopy() {
-  const cone1 = new THREE.ConeGeometry(3.0, 5.0, 6, 1);
-  cone1.translate(0, 7.5, 0);
-  const cone2 = new THREE.ConeGeometry(2.2, 4.0, 6, 1);
-  cone2.translate(0, 10.5, 0);
-  const cone3 = new THREE.ConeGeometry(1.4, 3.0, 6, 1);
-  cone3.translate(0, 13.0, 0);
+  const cone1 = new THREE.ConeGeometry(3.6, 6.0, 6, 1);
+  cone1.translate(0, 8.5, 0);
+  const cone2 = new THREE.ConeGeometry(2.6, 4.8, 6, 1);
+  cone2.translate(0, 12.0, 0);
+  const cone3 = new THREE.ConeGeometry(1.6, 3.6, 6, 1);
+  cone3.translate(0, 15.0, 0);
   
   const merged = mergeGeometries([cone1, cone2, cone3]);
   
@@ -99,23 +99,23 @@ function createPineCanopy() {
 
 /** Pine trunk */
 function createPineTrunk() {
-  const trunk = new THREE.CylinderGeometry(0.25, 0.35, 5.0, 5, 1);
-  trunk.translate(0, 2.5, 0);
+  const trunk = new THREE.CylinderGeometry(0.35, 0.5, 6.5, 5, 1);
+  trunk.translate(0, 3.25, 0);
   return trunk;
 }
 
 /** Broadleaf canopy with spherical normals */
 function createBroadleafCanopy() {
-  const canopy = new THREE.IcosahedronGeometry(4.0, 1);
+  const canopy = new THREE.IcosahedronGeometry(5.0, 1);
   canopy.computeVertexNormals();
-  canopy.translate(0, 9.0, 0);
+  canopy.translate(0, 11.0, 0);
   
   // Override normals to be spherical, pointing outward from center (0, 9, 0)
   const pos = canopy.attributes.position.array;
   const norms = canopy.attributes.normal.array;
   for (let i = 0; i < norms.length; i += 3) {
     norms[i] = pos[i];
-    norms[i + 1] = pos[i + 1] - 9.0 + 1.0; // point slightly more upwards (+1.0 offset)
+    norms[i + 1] = pos[i + 1] - 11.0 + 1.0; // point slightly more upwards (+1.0 offset)
     norms[i + 2] = pos[i + 2];
     const len = Math.sqrt(norms[i]**2 + norms[i+1]**2 + norms[i+2]**2);
     norms[i] /= len; norms[i+1] /= len; norms[i+2] /= len;
@@ -126,8 +126,8 @@ function createBroadleafCanopy() {
 
 /** Broadleaf trunk */
 function createBroadleafTrunk() {
-  const trunk = new THREE.CylinderGeometry(0.3, 0.5, 6.0, 5, 1);
-  trunk.translate(0, 3.0, 0);
+  const trunk = new THREE.CylinderGeometry(0.45, 0.7, 7.5, 5, 1);
+  trunk.translate(0, 3.75, 0);
   return trunk;
 }
 
@@ -229,8 +229,8 @@ uniform float uTime;
 `
     );
 
-    const maxH = type === 'pine' ? 15.0 : 12.0;
-    const trunkH = type === 'pine' ? 5.0 : 6.0;
+    const maxH = type === 'pine' ? 18.0 : 16.0;
+    const trunkH = type === 'pine' ? 6.5 : 7.5;
 
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
