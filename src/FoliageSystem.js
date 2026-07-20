@@ -303,33 +303,12 @@ function createTrunkMaterial() {
   barkTex.wrapT = THREE.RepeatWrapping;
   barkTex.repeat.set(1, 2); // Stretch bark vertically along the cylinder
 
-  const mat = new THREE.MeshStandardMaterial({
+  return new THREE.MeshStandardMaterial({
     color: 0x5a4a3a, // Slightly lightened to let bark texture show through
     map: barkTex,
     roughness: 0.95,
     metalness: 0.0,
-    alphaTest: 0.35, // Required for alphatest fragment to work
   });
-  
-  mat.onBeforeCompile = (shader) => {
-    // AI Chroma-Key: Discards grey/white/black backgrounds based on raw texture color
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <alphatest_fragment>',
-      `
-      #include <alphatest_fragment>
-      #ifdef USE_MAP
-        vec4 texelColorRaw = texture2D( map, vMapUv );
-        float maxC = max(texelColorRaw.r, max(texelColorRaw.g, texelColorRaw.b));
-        float minC = min(texelColorRaw.r, min(texelColorRaw.g, texelColorRaw.b));
-        if (maxC - minC < 0.05) discard;
-        diffuseColor.a = 1.0;
-      #endif
-      `
-    );
-  };
-
-  mat.customProgramCacheKey = () => 'foliage_trunk_chromakey';
-  return mat;
 }
 
 // ── FoliageSystem class ──────────────────────────────────────
