@@ -264,9 +264,24 @@ uniform float uTime;
   transformed.z += macroZ + microZ;
 `
     );
+
+    // AI generated textures often bake a solid black background instead of true alpha.
+    // We dynamically calculate luminance and force alpha to 0 for black pixels.
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `
+      #include <map_fragment>
+      #ifdef USE_MAP
+        float luma = dot(texelColor.rgb, vec3(0.299, 0.587, 0.114));
+        if (luma < 0.15) {
+          diffuseColor.a = 0.0;
+        }
+      #endif
+      `
+    );
   };
 
-  mat.customProgramCacheKey = () => `foliage_leaf_${type}`;
+  mat.customProgramCacheKey = () => \`foliage_leaf_\${type}\`;
   return mat;
 }
 
