@@ -165,7 +165,7 @@ function mergeGeometries(geos) {
 // ── Wind material factory ────────────────────────────────────
 
 function createGrassMaterial(uTimeRef) {
-  const grassTex = new THREE.TextureLoader().load('/textures/grass_blade_alpha.png');
+  const grassTex = new THREE.TextureLoader().load('/textures/grass_blade_alpha.png?v=2');
   grassTex.colorSpace = THREE.SRGBColorSpace;
 
   const mat = new THREE.MeshStandardMaterial({
@@ -200,6 +200,16 @@ uniform float uTime;
   transformed.z += windZ * heightSq;
 `
     );
+
+    // Auto-remove black or white backgrounds from AI generated images
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <alphatest_fragment>',
+      `
+      #include <alphatest_fragment>
+      float luma = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+      if (luma < 0.1 || luma > 0.95) discard;
+      `
+    );
   };
 
   mat.customProgramCacheKey = () => 'foliage_grass_textured';
@@ -207,7 +217,7 @@ uniform float uTime;
 }
 
 function createLeafMaterial(baseColor, type, uTimeRef) {
-  const leafTex = new THREE.TextureLoader().load('/textures/leaf_cluster_alpha.png');
+  const leafTex = new THREE.TextureLoader().load('/textures/leaf_cluster_alpha.png?v=2');
   leafTex.colorSpace = THREE.SRGBColorSpace;
 
   const mat = new THREE.MeshStandardMaterial({
@@ -248,6 +258,16 @@ uniform float uTime;
   transformed.x += macroX + microX;
   transformed.z += macroZ + microZ;
 `
+    );
+
+    // Auto-remove black or white backgrounds from AI generated images
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <alphatest_fragment>',
+      `
+      #include <alphatest_fragment>
+      float luma = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+      if (luma < 0.1 || luma > 0.95) discard;
+      `
     );
   };
 
