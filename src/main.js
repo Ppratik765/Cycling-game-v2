@@ -72,7 +72,7 @@ async function init() {
   const stepSkybox    = progress.addStep('Loading skybox…', 2);
   const stepTerrain   = progress.addStep('Generating terrain…', 2);
   const stepFoliage   = progress.addStep('Planting foliage…', 1);
-  const stepShaders   = progress.addStep('Compiling shaders…', 1);
+  const stepShaders   = progress.addStep('Compiling shaders (brief freeze expected)…', 1);
   const stepFinalize  = progress.addStep('Finalizing world…', 1);
 
   try {
@@ -230,6 +230,7 @@ async function init() {
     for (let i = 0; i < 60; i++) {
       rapierWorld.timestep = 1 / 60;
       rapierWorld.step();
+      if (i % 15 === 0) await LoadingProgress.yieldToUI(); // prevent freeze during physics
     }
 
     // ── Step 5: Compile shaders ───────────────────────────────
