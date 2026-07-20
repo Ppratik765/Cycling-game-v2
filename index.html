@@ -10,8 +10,119 @@
   <body>
     <!-- Loading overlay shown while assets load -->
     <div id="loading-overlay">
-      <div class="spinner"></div>
-      <p>Loading terrain…</p>
+
+      <!-- Animated SVG Cyclist -->
+      <svg id="cyclist-svg" viewBox="0 0 500 400" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="frameGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7c6aef"/>
+            <stop offset="100%" stop-color="#5a4fcf"/>
+          </linearGradient>
+          <linearGradient id="groundGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="transparent"/>
+            <stop offset="20%" stop-color="#3a3a4a"/>
+            <stop offset="80%" stop-color="#3a3a4a"/>
+            <stop offset="100%" stop-color="transparent"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Ground line -->
+        <line x1="50" y1="330" x2="450" y2="330" stroke="url(#groundGrad)" stroke-width="2"/>
+
+        <!-- Back wheel -->
+        <g class="wheel wheel-back">
+          <circle cx="160" cy="295" r="35" fill="none" stroke="#8a8a9a" stroke-width="3"/>
+          <circle cx="160" cy="295" r="4" fill="#8a8a9a"/>
+          <!-- Spokes -->
+          <line x1="160" y1="260" x2="160" y2="330" stroke="#6a6a7a" stroke-width="1"/>
+          <line x1="125" y1="295" x2="195" y2="295" stroke="#6a6a7a" stroke-width="1"/>
+          <line x1="135" y1="270" x2="185" y2="320" stroke="#6a6a7a" stroke-width="1"/>
+          <line x1="185" y1="270" x2="135" y2="320" stroke="#6a6a7a" stroke-width="1"/>
+        </g>
+
+        <!-- Front wheel -->
+        <g class="wheel wheel-front">
+          <circle cx="330" cy="295" r="35" fill="none" stroke="#8a8a9a" stroke-width="3"/>
+          <circle cx="330" cy="295" r="4" fill="#8a8a9a"/>
+          <!-- Spokes -->
+          <line x1="330" y1="260" x2="330" y2="330" stroke="#6a6a7a" stroke-width="1"/>
+          <line x1="295" y1="295" x2="365" y2="295" stroke="#6a6a7a" stroke-width="1"/>
+          <line x1="305" y1="270" x2="355" y2="320" stroke="#6a6a7a" stroke-width="1"/>
+          <line x1="355" y1="270" x2="305" y2="320" stroke="#6a6a7a" stroke-width="1"/>
+        </g>
+
+        <!-- Frame -->
+        <g class="bike-frame">
+          <!-- Down tube -->
+          <line x1="160" y1="295" x2="260" y2="220" stroke="url(#frameGrad)" stroke-width="4" stroke-linecap="round"/>
+          <!-- Top tube -->
+          <line x1="260" y1="220" x2="200" y2="220" stroke="url(#frameGrad)" stroke-width="4" stroke-linecap="round"/>
+          <!-- Seat tube -->
+          <line x1="200" y1="220" x2="190" y2="295" stroke="url(#frameGrad)" stroke-width="4" stroke-linecap="round"/>
+          <!-- Chain stay -->
+          <line x1="160" y1="295" x2="190" y2="295" stroke="url(#frameGrad)" stroke-width="3" stroke-linecap="round"/>
+          <!-- Seat stay -->
+          <line x1="160" y1="295" x2="200" y2="220" stroke="url(#frameGrad)" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- Fork -->
+          <line x1="260" y1="220" x2="310" y2="210" stroke="url(#frameGrad)" stroke-width="4" stroke-linecap="round"/>
+          <line x1="310" y1="210" x2="330" y2="295" stroke="url(#frameGrad)" stroke-width="3.5" stroke-linecap="round"/>
+          <!-- Handlebar -->
+          <line x1="300" y1="200" x2="320" y2="215" stroke="#8a8a9a" stroke-width="3" stroke-linecap="round"/>
+          <!-- Seat -->
+          <ellipse cx="195" cy="215" rx="14" ry="4" fill="#4a4a5a"/>
+          <!-- Pedal crank center -->
+          <circle cx="190" cy="295" r="5" fill="#7c6aef"/>
+        </g>
+
+        <!-- Pedal crank + legs (animated group) -->
+        <g class="crank-group" style="transform-origin: 190px 295px;">
+          <!-- Crank arm -->
+          <line x1="190" y1="295" x2="190" y2="320" stroke="#6a6a7a" stroke-width="3" stroke-linecap="round"/>
+          <rect x="182" y="318" width="16" height="4" rx="2" fill="#5a5a6a"/>
+
+          <!-- Leg (simplified) -->
+          <!-- Thigh -->
+          <line x1="200" y1="225" x2="195" y2="268" stroke="#c5a882" stroke-width="6" stroke-linecap="round"/>
+          <!-- Shin -->
+          <line x1="195" y1="268" x2="190" y2="315" stroke="#c5a882" stroke-width="5" stroke-linecap="round"/>
+        </g>
+
+        <!-- Rider body -->
+        <g class="rider-body">
+          <!-- Torso -->
+          <line x1="200" y1="225" x2="270" y2="195" stroke="#c5a882" stroke-width="7" stroke-linecap="round"/>
+          <!-- Arm -->
+          <line x1="260" y1="200" x2="310" y2="205" stroke="#c5a882" stroke-width="5" stroke-linecap="round"/>
+          <!-- Head -->
+          <circle cx="278" cy="180" r="14" fill="#c5a882"/>
+          <!-- Helmet -->
+          <path d="M264 178 Q278 158 292 178" fill="#7c6aef" stroke="none"/>
+          <ellipse cx="278" cy="178" rx="16" ry="8" fill="#7c6aef"/>
+        </g>
+
+        <!-- Speed lines (animated) -->
+        <g class="speed-lines" opacity="0.3">
+          <line x1="80" y1="240" x2="40" y2="240" stroke="#7c6aef" stroke-width="2" stroke-linecap="round"/>
+          <line x1="90" y1="260" x2="30" y2="260" stroke="#7c6aef" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="85" y1="280" x2="50" y2="280" stroke="#7c6aef" stroke-width="1" stroke-linecap="round"/>
+          <line x1="75" y1="300" x2="45" y2="300" stroke="#7c6aef" stroke-width="1.5" stroke-linecap="round"/>
+        </g>
+      </svg>
+
+      <!-- Progress section -->
+      <div id="loading-progress-wrapper">
+        <div id="loading-progress-bar">
+          <div id="loading-progress-fill"></div>
+        </div>
+        <p id="loading-status">Initializing engine…</p>
+      </div>
+
+      <!-- Error state (hidden by default) -->
+      <div id="loading-error" class="loading-error-hidden">
+        <p>⚠ Failed to load game assets</p>
+        <p id="loading-error-detail"></p>
+        <button onclick="location.reload()">Retry</button>
+      </div>
     </div>
 
     <!-- Three.js renderer is appended here -->
