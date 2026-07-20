@@ -78,21 +78,28 @@ function createGrassTuft() {
 
 /** Layered pine canopy with fluffed normals */
 function createPineCanopy() {
-  const cone1 = new THREE.ConeGeometry(4.5, 7.5, 6, 1);
-  cone1.translate(0, 10.5, 0);
-  const cone2 = new THREE.ConeGeometry(3.2, 6.0, 6, 1);
-  cone2.translate(0, 15.0, 0);
-  const cone3 = new THREE.ConeGeometry(2.0, 4.5, 6, 1);
-  cone3.translate(0, 18.75, 0);
+  const planes = [];
   
-  const outer = mergeGeometries([cone1, cone2, cone3]);
+  const addLayer = (y, w, h, rotationOffset) => {
+    for (let i = 0; i < 3; i++) {
+      const plane = new THREE.PlaneGeometry(w, h, 1, 1);
+      plane.rotateY((Math.PI / 3) * i + rotationOffset);
+      
+      // Slight pitch to make branches droop naturally
+      plane.rotateX(0.15); 
+      
+      plane.translate(0, y, 0);
+      planes.push(plane);
+    }
+  };
+
+  // Stack 4 layers of decreasing size to form a pine profile
+  addLayer(9.0, 9.5, 7.0, 0);
+  addLayer(13.0, 7.5, 6.0, 0.5);
+  addLayer(17.0, 5.5, 5.0, 1.0);
+  addLayer(20.5, 3.5, 4.0, 1.5);
   
-  // Inner layer to fill in transparent gaps
-  const inner = outer.clone();
-  inner.scale(0.7, 0.9, 0.7); 
-  inner.rotateY(Math.PI / 4);
-  
-  const merged = mergeGeometries([outer, inner]);
+  const merged = mergeGeometries(planes);
   
   // Bend normals outwards and upwards to create soft, fluffy volumetric shading
   const pos = merged.attributes.position.array;
@@ -117,20 +124,36 @@ function createPineTrunk() {
 
 /** Broadleaf canopy with spherical normals */
 function createBroadleafCanopy() {
-  const outer = new THREE.IcosahedronGeometry(6.5, 1);
-  outer.translate(0, 14.0, 0);
+  const planes = [];
   
-  const inner1 = new THREE.IcosahedronGeometry(5.2, 1);
-  inner1.rotateY(Math.PI / 3);
-  inner1.rotateX(Math.PI / 4);
-  inner1.translate(0, 14.0, 0);
-  
-  const inner2 = new THREE.IcosahedronGeometry(3.5, 0);
-  inner2.rotateY(Math.PI / 6);
-  inner2.rotateZ(Math.PI / 4);
-  inner2.translate(0, 14.0, 0);
+  const addCluster = (x, y, z, size, rotOffset) => {
+    for (let i = 0; i < 3; i++) {
+      const plane = new THREE.PlaneGeometry(size, size, 1, 1);
+      plane.rotateY((Math.PI / 3) * i + rotOffset);
+      
+      // Randomize pitch/roll slightly for chaotic, organic leaves
+      plane.rotateX((Math.random() - 0.5) * 0.5);
+      plane.rotateZ((Math.random() - 0.5) * 0.5);
+      
+      plane.translate(x, y, z);
+      planes.push(plane);
+    }
+  };
 
-  const merged = mergeGeometries([outer, inner1, inner2]);
+  // Central core
+  addCluster(0, 14.0, 0, 13.0, 0);
+  
+  // Surrounding fluffy clusters
+  const r = 4.0;
+  addCluster(r, 13.0, 0, 9.0, 0.5);
+  addCluster(-r, 13.0, 0, 9.0, 1.0);
+  addCluster(0, 13.0, r, 9.0, 1.5);
+  addCluster(0, 13.0, -r, 9.0, 2.0);
+  
+  // Top cluster
+  addCluster(0, 18.0, 0, 10.0, 2.5);
+  
+  const merged = mergeGeometries(planes);
   
   // Override normals to be spherical, pointing outward from center (0, 14, 0)
   const pos = merged.attributes.position.array;
