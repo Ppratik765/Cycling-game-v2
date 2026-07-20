@@ -165,7 +165,7 @@ function mergeGeometries(geos) {
 // ── Wind material factory ────────────────────────────────────
 
 function createGrassMaterial(uTimeRef) {
-  const grassTex = new THREE.TextureLoader().load('/textures/grass_blade_alpha.png?v=2');
+  const grassTex = new THREE.TextureLoader().load('/textures/grass_blade_alpha.png?v=3');
   grassTex.colorSpace = THREE.SRGBColorSpace;
 
   const mat = new THREE.MeshStandardMaterial({
@@ -209,7 +209,7 @@ uniform float uTime;
 }
 
 function createLeafMaterial(baseColor, type, uTimeRef) {
-  const leafTex = new THREE.TextureLoader().load('/textures/leaf_cluster_alpha.png?v=2');
+  const leafTex = new THREE.TextureLoader().load('/textures/leaf_cluster_alpha.png?v=3');
   leafTex.colorSpace = THREE.SRGBColorSpace;
 
   const mat = new THREE.MeshStandardMaterial({
