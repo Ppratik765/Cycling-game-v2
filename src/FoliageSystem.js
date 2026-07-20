@@ -8,7 +8,7 @@ import * as THREE from 'three';
 
 // ── Constants ────────────────────────────────────────────────
 
-const GRASS_PER_CHUNK       = 15000;
+const GRASS_PER_CHUNK       = 220000;
 const PINE_PER_CHUNK        = 40;
 const BROADLEAF_PER_CHUNK   = 20;
 

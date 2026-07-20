@@ -71,7 +71,7 @@ export class TerrainBackdrop {
       roughness: 0.92,
       metalness: 0.0,
       side: THREE.BackSide,
-      fog: true,            // Participate in scene.fog instead of faking it
+      fog: false,           // Disabled so it doesn't get 100% swallowed by scene.fog, relying only on custom hazeMix
     });
 
     // Inject distance-based atmospheric haze in fragment shader
