@@ -58,8 +58,7 @@ export class TerrainChunkManager {
     const cz = Math.round(focusZ / this.chunkSize);
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        this._createChunk(cx + dx, cz + dz);
-        if (yieldFn) await yieldFn();
+        await this._createChunkAsync(cx + dx, cz + dz, yieldFn);
       }
     }
     this._lastCX = cx;
@@ -115,6 +114,28 @@ export class TerrainChunkManager {
   }
 
   // ── Internal ────────────────────────────────────────────────
+
+  async _createChunkAsync(cx, cz, yieldFn) {
+    const key = `${cx},${cz}`;
+    if (this.chunks.has(key)) return;
+    let chunk;
+    if (this._pool.length > 0) {
+      chunk = this._pool.pop();
+    } else {
+      chunk = this._buildNewChunk();
+    }
+    chunk.cx = cx;
+    chunk.cz = cz;
+    if (yieldFn) await yieldFn();
+    this._updateChunkGeometry(chunk, cx, cz);
+    if (yieldFn) await yieldFn();
+    if (this.foliage && this.foliage.populateChunkAsync) {
+      await this.foliage.populateChunkAsync(cx, cz, this.chunkSize, yieldFn);
+    } else if (this.foliage) {
+      this.foliage.populateChunk(cx, cz, this.chunkSize);
+    }
+    this.chunks.set(key, chunk);
+  }
 
   _createChunk(cx, cz) {
     const size = this.chunkSize;

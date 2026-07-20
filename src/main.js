@@ -230,6 +230,7 @@ async function init() {
     for (let i = 0; i < 60; i++) {
       rapierWorld.timestep = 1 / 60;
       rapierWorld.step();
+      if (i % 10 === 0) await LoadingProgress.yieldToUI();
     }
 
     // ── Step 5: Compile shaders ───────────────────────────────
