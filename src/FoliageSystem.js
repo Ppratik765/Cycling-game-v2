@@ -41,17 +41,17 @@ function chunkSeed(cx, cz) {
 
 /** Grass tuft: Efficient V-shape (2 planes) with upward normals for perfect terrain blending */
 function createGrassTuft() {
-  const w = 0.6, h = 1.6;
+  const w = 0.12, h = 1.6;
   const planes = [];
   
-  // Create 3 planes rotated at 60 degree intervals (0, 60, 120) for a lush star shape
-  for (let i = 0; i < 3; i++) {
+  // Create 4 planes rotated at 45 degree intervals (0, 45, 90, 135)
+  for (let i = 0; i < 4; i++) {
     const plane = new THREE.PlaneGeometry(w * 2, h, 1, 3);
-    plane.rotateY((Math.PI / 3) * i);
+    plane.rotateY((Math.PI / 4) * i);
     
-    // Add varying leans to make the clump fan outward naturally
-    const leanX = (i === 0 ? 0.2 : (i === 1 ? -0.1 : 0.1));
-    const leanZ = (i === 1 ? 0.2 : -0.15);
+    // Add a slight lean to make the clump fan outward
+    const leanX = (i % 2 === 0 ? 0.15 : -0.15);
+    const leanZ = (i > 1 ? 0.15 : -0.15);
     plane.rotateX(leanX);
     plane.rotateZ(leanZ);
     
@@ -61,8 +61,7 @@ function createGrassTuft() {
   
   const merged = mergeGeometries(planes);
   
-  // Override normals to point straight up (0, 1, 0)
-  // This AAA trick makes grass shade exactly like the terrain underneath it
+  // Override normals to point straight up (0, 1, 0) for perfect terrain blending
   const norms = merged.attributes.normal.array;
   for (let i = 0; i < norms.length; i += 3) {
     norms[i] = 0.0;
@@ -70,7 +69,6 @@ function createGrassTuft() {
     norms[i + 2] = 0.0;
   }
   
-  return merged;
 }
 
 /** Layered pine canopy with fluffed normals */
