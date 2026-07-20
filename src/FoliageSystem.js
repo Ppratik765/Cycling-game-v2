@@ -140,14 +140,19 @@ function mergeGeometries(geos) {
   }
   const pos = new Float32Array(totalVerts * 3);
   const norm = new Float32Array(totalVerts * 3);
+  const uv = new Float32Array(totalVerts * 2);
   const idx = [];
   let vOff = 0;
   for (const g of geos) {
     const p = g.attributes.position.array;
     const n = g.attributes.normal ? g.attributes.normal.array : new Float32Array(p.length);
+    const u = g.attributes.uv ? g.attributes.uv.array : new Float32Array((p.length / 3) * 2);
     for (let i = 0; i < p.length; i++) {
       pos[vOff * 3 + i] = p[i];
       norm[vOff * 3 + i] = n[i];
+    }
+    for (let i = 0; i < u.length; i++) {
+      uv[vOff * 2 + i] = u[i];
     }
     if (g.index) {
       for (let i = 0; i < g.index.count; i++) idx.push(g.index.array[i] + vOff);
@@ -157,6 +162,7 @@ function mergeGeometries(geos) {
   const merged = new THREE.BufferGeometry();
   merged.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   merged.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
+  merged.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   merged.setIndex(idx);
   merged.computeVertexNormals();
   return merged;
