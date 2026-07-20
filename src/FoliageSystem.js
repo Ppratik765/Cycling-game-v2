@@ -281,7 +281,7 @@ uniform float uTime;
     );
   };
 
-  mat.customProgramCacheKey = () => \`foliage_leaf_\${type}\`;
+  mat.customProgramCacheKey = () => `foliage_leaf_${type}`;
   return mat;
 }
 
