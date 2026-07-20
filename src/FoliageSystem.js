@@ -258,7 +258,20 @@ uniform float uTime;
 `
     );
 
-
+    // AI Chroma-Key: Discards grey/white/black backgrounds based on raw texture color
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <alphatest_fragment>',
+      `
+      #include <alphatest_fragment>
+      #ifdef USE_MAP
+        vec4 texelColorRaw = texture2D( map, vMapUv );
+        float maxC = max(texelColorRaw.r, max(texelColorRaw.g, texelColorRaw.b));
+        float minC = min(texelColorRaw.r, min(texelColorRaw.g, texelColorRaw.b));
+        if (maxC - minC < 0.05) discard;
+        diffuseColor.a = 1.0;
+      #endif
+      `
+    );
   };
 
   mat.customProgramCacheKey = () => `foliage_leaf_${type}`;
