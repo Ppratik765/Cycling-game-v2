@@ -72,61 +72,71 @@ function createGrassTuft() {
   return merged;
 }
 
-/** Layered pine canopy — 4 stacked cones for a proper conifer silhouette */
-function createPineCanopy() {
-  const cones = [];
-  const layers = [  // [radius, height, yCenter]
-    [5.0, 6.0, 10.0],
-    [4.0, 5.5, 13.5],
-    [3.0, 5.0, 16.5],
-    [2.0, 4.0, 19.0],
-  ];
-  for (const [r, h, y] of layers) {
-    const cone = new THREE.ConeGeometry(r, h, 7, 1);
-    cone.translate(0, y, 0);
-    cones.push(cone);
-  }
-  const merged = mergeGeometries(cones);
-  // Soften normals upward for volumetric look
+/** Create a cross-quad cluster for photorealistic leaves */
+function createCrossQuad(size, yOffset) {
+  const q1 = new THREE.PlaneGeometry(size, size, 1, 1);
+  const q2 = new THREE.PlaneGeometry(size, size, 1, 1);
+  q2.rotateY(Math.PI / 2);
+  
+  const merged = mergeGeometries([q1, q2]);
+  merged.translate(0, yOffset, 0);
+  
+  // Spherize normals for volumetric shading
+  const pos = merged.attributes.position.array;
   const norms = merged.attributes.normal.array;
   for (let i = 0; i < norms.length; i += 3) {
-    norms[i] *= 0.5;
-    norms[i + 1] = Math.abs(norms[i + 1]) * 0.5 + 0.5;
-    norms[i + 2] *= 0.5;
+    norms[i] = pos[i];
+    norms[i + 1] = Math.abs(pos[i + 1] - yOffset) + (size * 0.5); // Bias upward
+    norms[i + 2] = pos[i + 2];
     const len = Math.sqrt(norms[i] ** 2 + norms[i + 1] ** 2 + norms[i + 2] ** 2) || 1;
     norms[i] /= len; norms[i + 1] /= len; norms[i + 2] /= len;
   }
   return merged;
 }
 
+/** Pine canopy — stacked cross-quads */
+function createPineCanopy() {
+  const layers = [
+    createCrossQuad(10.0, 7.0),
+    createCrossQuad(8.5, 10.5),
+    createCrossQuad(7.0, 14.0),
+    createCrossQuad(5.0, 17.0)
+  ];
+  return mergeGeometries(layers);
+}
+
 /** Pine trunk — thick, tall cylinder */
 function createPineTrunk() {
-  const trunk = new THREE.CylinderGeometry(0.4, 0.65, 10.0, 6, 1);
-  trunk.translate(0, 5.0, 0);
+  const trunk = new THREE.CylinderGeometry(0.45, 0.7, 12.0, 6, 1);
+  trunk.translate(0, 6.0, 0);
   return trunk;
 }
 
-/** Broadleaf canopy — icosahedron for a round, fluffy shape */
+/** Broadleaf canopy — clustered cross-quads */
 function createBroadleafCanopy() {
-  const canopy = new THREE.IcosahedronGeometry(6.5, 1);
-  canopy.translate(0, 14.0, 0);
-  // Soften normals for smooth volumetric shading
-  const pos = canopy.attributes.position.array;
-  const norms = canopy.attributes.normal.array;
-  for (let i = 0; i < norms.length; i += 3) {
-    norms[i] = pos[i];
-    norms[i + 1] = (pos[i + 1] - 14.0) + 2.0; // bias upward
-    norms[i + 2] = pos[i + 2];
-    const len = Math.sqrt(norms[i] ** 2 + norms[i + 1] ** 2 + norms[i + 2] ** 2) || 1;
-    norms[i] /= len; norms[i + 1] /= len; norms[i + 2] /= len;
-  }
-  return canopy;
+  const q1 = createCrossQuad(12.0, 10.0);
+  
+  const q2 = createCrossQuad(10.0, 11.0);
+  q2.translate(3.0, 0, 0);
+  
+  const q3 = createCrossQuad(10.0, 11.0);
+  q3.translate(-3.0, 0, 0);
+  
+  const q4 = createCrossQuad(10.0, 11.0);
+  q4.translate(0, 0, 3.0);
+  
+  const q5 = createCrossQuad(10.0, 11.0);
+  q5.translate(0, 0, -3.0);
+  
+  const q6 = createCrossQuad(10.0, 14.0);
+  
+  return mergeGeometries([q1, q2, q3, q4, q5, q6]);
 }
 
 /** Broadleaf trunk — thick cylinder */
 function createBroadleafTrunk() {
-  const trunk = new THREE.CylinderGeometry(0.5, 0.8, 9.0, 6, 1);
-  trunk.translate(0, 4.5, 0);
+  const trunk = new THREE.CylinderGeometry(0.6, 1.0, 8.0, 6, 1);
+  trunk.translate(0, 4.0, 0);
   return trunk;
 }
 
@@ -292,8 +302,8 @@ export class FoliageSystem {
 
     // Shared materials
     this._grassMat      = createGrassMaterial(this.uTime);
-    this._pineLeafMat   = createLeafMaterial(0x3a6630, 'pine', this.uTime);    // Desaturated pine green
-    this._broadLeafMat  = createLeafMaterial(0x4a7a3a, 'broadleaf', this.uTime); // Desaturated broadleaf
+    this._pineLeafMat   = createLeafMaterial(0xffffff, 'pine', this.uTime);
+    this._broadLeafMat  = createLeafMaterial(0xffffff, 'broadleaf', this.uTime);
     this._trunkMat      = createTrunkMaterial();
 
     this.chunkFoliage = new Map();
@@ -310,7 +320,7 @@ export class FoliageSystem {
     this.uTime.value = elapsedTime;
   }
 
-  populateChunk(cx, cz, chunkSize) {
+  async populateChunk(cx, cz, chunkSize, yieldFn = null) {
     const key = `${cx},${cz}`;
     this.removeChunk(key);
 
@@ -333,6 +343,8 @@ export class FoliageSystem {
 
     // ── Grass pass ────────────────────────────────────────────
     for (let i = 0; i < GRASS_PER_CHUNK; i++) {
+      // Yield to UI periodically during this massive loop to prevent animation stuttering
+      if (yieldFn && i > 0 && i % 4000 === 0) await yieldFn();
       const localX = (rng() - 0.5) * chunkSize;
       const localZ = (rng() - 0.5) * chunkSize;
       const worldX = localX + worldOriginX;
