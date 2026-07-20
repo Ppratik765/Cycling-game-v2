@@ -14,99 +14,78 @@
       <!-- Animated SVG Cyclist -->
       <svg id="cyclist-svg" viewBox="0 0 500 400" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <linearGradient id="frameGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#7c6aef"/>
-            <stop offset="100%" stop-color="#5a4fcf"/>
+          <linearGradient id="neonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00f2fe"/>
+            <stop offset="100%" stop-color="#4facfe"/>
           </linearGradient>
-          <linearGradient id="groundGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="transparent"/>
-            <stop offset="20%" stop-color="#3a3a4a"/>
-            <stop offset="80%" stop-color="#3a3a4a"/>
-            <stop offset="100%" stop-color="transparent"/>
+          <linearGradient id="neonGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#f093fb"/>
+            <stop offset="100%" stop-color="#f5576c"/>
           </linearGradient>
         </defs>
 
-        <!-- Ground line -->
-        <line x1="50" y1="330" x2="450" y2="330" stroke="url(#groundGrad)" stroke-width="2"/>
-
-        <!-- Back wheel -->
-        <g class="wheel wheel-back">
-          <circle cx="160" cy="295" r="35" fill="none" stroke="#8a8a9a" stroke-width="3"/>
-          <circle cx="160" cy="295" r="4" fill="#8a8a9a"/>
-          <!-- Spokes -->
-          <line x1="160" y1="260" x2="160" y2="330" stroke="#6a6a7a" stroke-width="1"/>
-          <line x1="125" y1="295" x2="195" y2="295" stroke="#6a6a7a" stroke-width="1"/>
-          <line x1="135" y1="270" x2="185" y2="320" stroke="#6a6a7a" stroke-width="1"/>
-          <line x1="185" y1="270" x2="135" y2="320" stroke="#6a6a7a" stroke-width="1"/>
+        <!-- Dynamic speed lines behind -->
+        <g class="speed-lines" opacity="0.6">
+          <line x1="450" y1="200" x2="50" y2="200" stroke="url(#neonGrad)" stroke-width="2" stroke-linecap="round" stroke-dasharray="40 120"/>
+          <line x1="480" y1="250" x2="80" y2="250" stroke="url(#neonGrad2)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="60 100"/>
+          <line x1="420" y1="150" x2="100" y2="150" stroke="url(#neonGrad)" stroke-width="3" stroke-linecap="round" stroke-dasharray="30 150"/>
         </g>
 
-        <!-- Front wheel -->
-        <g class="wheel wheel-front">
-          <circle cx="330" cy="295" r="35" fill="none" stroke="#8a8a9a" stroke-width="3"/>
-          <circle cx="330" cy="295" r="4" fill="#8a8a9a"/>
-          <!-- Spokes -->
-          <line x1="330" y1="260" x2="330" y2="330" stroke="#6a6a7a" stroke-width="1"/>
-          <line x1="295" y1="295" x2="365" y2="295" stroke="#6a6a7a" stroke-width="1"/>
-          <line x1="305" y1="270" x2="355" y2="320" stroke="#6a6a7a" stroke-width="1"/>
-          <line x1="355" y1="270" x2="305" y2="320" stroke="#6a6a7a" stroke-width="1"/>
-        </g>
+        <!-- The Bicycle & Rider (group bobs up and down) -->
+        <g class="rider-bob">
+          <!-- Back Wheel -->
+          <g class="wheel wheel-back" style="transform-origin: 140px 260px;">
+            <circle cx="140" cy="260" r="50" fill="none" stroke="#1f1f2e" stroke-width="12"/>
+            <circle cx="140" cy="260" r="50" fill="none" stroke="url(#neonGrad)" stroke-width="12" stroke-dasharray="30 10"/>
+            <circle cx="140" cy="260" r="40" fill="none" stroke="#2a2a3a" stroke-width="2"/>
+            <path d="M140 220 L140 300 M100 260 L180 260 M111 231 L169 289 M111 289 L169 231" stroke="#3a3a4a" stroke-width="2"/>
+            <circle cx="140" cy="260" r="8" fill="#4facfe"/>
+          </g>
 
-        <!-- Frame -->
-        <g class="bike-frame">
-          <!-- Down tube -->
-          <line x1="160" y1="295" x2="260" y2="220" stroke="url(#frameGrad)" stroke-width="4" stroke-linecap="round"/>
-          <!-- Top tube -->
-          <line x1="260" y1="220" x2="200" y2="220" stroke="url(#frameGrad)" stroke-width="4" stroke-linecap="round"/>
-          <!-- Seat tube -->
-          <line x1="200" y1="220" x2="190" y2="295" stroke="url(#frameGrad)" stroke-width="4" stroke-linecap="round"/>
-          <!-- Chain stay -->
-          <line x1="160" y1="295" x2="190" y2="295" stroke="url(#frameGrad)" stroke-width="3" stroke-linecap="round"/>
-          <!-- Seat stay -->
-          <line x1="160" y1="295" x2="200" y2="220" stroke="url(#frameGrad)" stroke-width="2.5" stroke-linecap="round"/>
-          <!-- Fork -->
-          <line x1="260" y1="220" x2="310" y2="210" stroke="url(#frameGrad)" stroke-width="4" stroke-linecap="round"/>
-          <line x1="310" y1="210" x2="330" y2="295" stroke="url(#frameGrad)" stroke-width="3.5" stroke-linecap="round"/>
-          <!-- Handlebar -->
-          <line x1="300" y1="200" x2="320" y2="215" stroke="#8a8a9a" stroke-width="3" stroke-linecap="round"/>
-          <!-- Seat -->
-          <ellipse cx="195" cy="215" rx="14" ry="4" fill="#4a4a5a"/>
-          <!-- Pedal crank center -->
-          <circle cx="190" cy="295" r="5" fill="#7c6aef"/>
-        </g>
+          <!-- Front Wheel -->
+          <g class="wheel wheel-front" style="transform-origin: 360px 260px;">
+            <circle cx="360" cy="260" r="50" fill="none" stroke="#1f1f2e" stroke-width="12"/>
+            <circle cx="360" cy="260" r="50" fill="none" stroke="url(#neonGrad2)" stroke-width="12" stroke-dasharray="30 10"/>
+            <circle cx="360" cy="260" r="40" fill="none" stroke="#2a2a3a" stroke-width="2"/>
+            <path d="M360 220 L360 300 M320 260 L400 260 M331 231 L389 289 M331 289 L389 231" stroke="#3a3a4a" stroke-width="2"/>
+            <circle cx="360" cy="260" r="8" fill="#f5576c"/>
+          </g>
 
-        <!-- Pedal crank + legs (animated group) -->
-        <g class="crank-group" style="transform-origin: 190px 295px;">
-          <!-- Crank arm -->
-          <line x1="190" y1="295" x2="190" y2="320" stroke="#6a6a7a" stroke-width="3" stroke-linecap="round"/>
-          <rect x="182" y="318" width="16" height="4" rx="2" fill="#5a5a6a"/>
+          <!-- Bike Frame -->
+          <!-- Top Tube & Seatstay -->
+          <path d="M140 260 L190 170 L300 170 L360 260" fill="none" stroke="#2a2a3a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Chainstay & Downtube -->
+          <path d="M140 260 L210 260 L300 170" fill="none" stroke="url(#neonGrad)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Seat Tube -->
+          <path d="M190 170 L210 260" fill="none" stroke="url(#neonGrad2)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+          
+          <!-- Front Suspension Fork & Handlebars -->
+          <line x1="300" y1="170" x2="330" y2="120" stroke="#2a2a3a" stroke-width="8" stroke-linecap="round"/>
+          <line x1="330" y1="120" x2="345" y2="115" stroke="url(#neonGrad2)" stroke-width="8" stroke-linecap="round"/>
 
-          <!-- Leg (simplified) -->
-          <!-- Thigh -->
-          <line x1="200" y1="225" x2="195" y2="268" stroke="#c5a882" stroke-width="6" stroke-linecap="round"/>
-          <!-- Shin -->
-          <line x1="195" y1="268" x2="190" y2="315" stroke="#c5a882" stroke-width="5" stroke-linecap="round"/>
-        </g>
+          <!-- Saddle & Post -->
+          <line x1="190" y1="170" x2="175" y2="130" stroke="#2a2a3a" stroke-width="8" stroke-linecap="round"/>
+          <path d="M160 130 Q175 125 195 135" fill="none" stroke="url(#neonGrad)" stroke-width="10" stroke-linecap="round"/>
 
-        <!-- Rider body -->
-        <g class="rider-body">
+          <!-- Stylized Rider -->
           <!-- Torso -->
-          <line x1="200" y1="225" x2="270" y2="195" stroke="#c5a882" stroke-width="7" stroke-linecap="round"/>
+          <path d="M175 115 Q250 85 320 105" fill="none" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>
           <!-- Arm -->
-          <line x1="260" y1="200" x2="310" y2="205" stroke="#c5a882" stroke-width="5" stroke-linecap="round"/>
-          <!-- Head -->
-          <circle cx="278" cy="180" r="14" fill="#c5a882"/>
-          <!-- Helmet -->
-          <path d="M264 178 Q278 158 292 178" fill="#7c6aef" stroke="none"/>
-          <ellipse cx="278" cy="178" rx="16" ry="8" fill="#7c6aef"/>
+          <path d="M315 105 Q340 110 335 120" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round"/>
+          <!-- Leg (Static, posed for downhill attack position) -->
+          <path d="M185 120 Q220 180 210 260" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round"/>
+
+          <!-- Aero Helmet -->
+          <path d="M315 95 Q345 90 350 70 Q320 60 300 85 Z" fill="url(#neonGrad2)"/>
+          <path d="M350 70 Q355 80 335 90" fill="none" stroke="#00f2fe" stroke-width="4" stroke-linecap="round"/>
+
+          <!-- Pedal Platform -->
+          <line x1="210" y1="260" x2="195" y2="260" stroke="#4facfe" stroke-width="8" stroke-linecap="round"/>
         </g>
 
-        <!-- Speed lines (animated) -->
-        <g class="speed-lines" opacity="0.3">
-          <line x1="80" y1="240" x2="40" y2="240" stroke="#7c6aef" stroke-width="2" stroke-linecap="round"/>
-          <line x1="90" y1="260" x2="30" y2="260" stroke="#7c6aef" stroke-width="1.5" stroke-linecap="round"/>
-          <line x1="85" y1="280" x2="50" y2="280" stroke="#7c6aef" stroke-width="1" stroke-linecap="round"/>
-          <line x1="75" y1="300" x2="45" y2="300" stroke="#7c6aef" stroke-width="1.5" stroke-linecap="round"/>
-        </g>
+        <!-- Glowing Ground -->
+        <line x1="50" y1="320" x2="450" y2="320" stroke="#2a2a3a" stroke-width="4" stroke-linecap="round"/>
+        <line x1="100" y1="320" x2="400" y2="320" stroke="url(#neonGrad)" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
       </svg>
 
       <!-- Progress section -->

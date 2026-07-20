@@ -65,36 +65,18 @@ html, body {
   animation: wheelSpin 1.2s linear infinite;
 }
 
-.wheel-back {
-  transform-origin: 160px 295px;
-}
-
-.wheel-front {
-  transform-origin: 330px 295px;
-}
-
 @keyframes wheelSpin {
   to { transform: rotate(360deg); }
 }
 
-/* Crank/pedal rotation */
-.crank-group {
-  animation: crankSpin 1.2s linear infinite;
-  transform-origin: 190px 295px;
-}
-
-@keyframes crankSpin {
-  to { transform: rotate(360deg); }
-}
-
-/* Rider body slight bob */
-.rider-body {
+/* Bike & Rider bobbing */
+.rider-bob {
   animation: riderBob 0.6s ease-in-out infinite alternate;
 }
 
 @keyframes riderBob {
   0% { transform: translateY(0); }
-  100% { transform: translateY(-3px); }
+  100% { transform: translateY(-4px); }
 }
 
 /* Speed lines pulse */
