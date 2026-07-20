@@ -85,7 +85,15 @@ function createPineCanopy() {
   const cone3 = new THREE.ConeGeometry(2.0, 4.5, 6, 1);
   cone3.translate(0, 18.75, 0);
   
-  const merged = mergeGeometries([cone1, cone2, cone3]);
+  const cone4 = new THREE.ConeGeometry(4.0, 6.5, 6, 1);
+  cone4.rotateX(0.1);
+  cone4.translate(0.5, 11.5, -0.5);
+
+  const cone5 = new THREE.ConeGeometry(3.0, 5.0, 6, 1);
+  cone5.rotateZ(-0.1);
+  cone5.translate(-0.5, 16.0, 0.5);
+  
+  const merged = mergeGeometries([cone1, cone2, cone3, cone4, cone5]);
   
   // Bend normals outwards and upwards to create soft, fluffy volumetric shading
   const pos = merged.attributes.position.array;
@@ -110,9 +118,19 @@ function createPineTrunk() {
 
 /** Broadleaf canopy with spherical normals */
 function createBroadleafCanopy() {
-  const canopy = new THREE.IcosahedronGeometry(6.5, 1);
-  canopy.computeVertexNormals();
-  canopy.translate(0, 14.0, 0);
+  const c1 = new THREE.IcosahedronGeometry(6.5, 1);
+  c1.translate(0, 14.0, 0);
+
+  const c2 = new THREE.IcosahedronGeometry(5.0, 1);
+  c2.translate(3.0, 12.0, 0.0);
+
+  const c3 = new THREE.IcosahedronGeometry(5.0, 1);
+  c3.translate(-3.0, 13.0, 2.0);
+
+  const c4 = new THREE.IcosahedronGeometry(5.0, 1);
+  c4.translate(-1.0, 15.0, -3.5);
+  
+  const canopy = mergeGeometries([c1, c2, c3, c4]);
   
   // Override normals to be spherical, pointing outward from center (0, 9, 0)
   const pos = canopy.attributes.position.array;
@@ -285,12 +303,33 @@ function createTrunkMaterial() {
   barkTex.wrapT = THREE.RepeatWrapping;
   barkTex.repeat.set(1, 2); // Stretch bark vertically along the cylinder
 
-  return new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshStandardMaterial({
     color: 0x5a4a3a, // Slightly lightened to let bark texture show through
     map: barkTex,
     roughness: 0.95,
     metalness: 0.0,
+    alphaTest: 0.35, // Required for alphatest fragment to work
   });
+  
+  mat.onBeforeCompile = (shader) => {
+    // AI Chroma-Key: Discards grey/white/black backgrounds based on raw texture color
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <alphatest_fragment>',
+      `
+      #include <alphatest_fragment>
+      #ifdef USE_MAP
+        vec4 texelColorRaw = texture2D( map, vMapUv );
+        float maxC = max(texelColorRaw.r, max(texelColorRaw.g, texelColorRaw.b));
+        float minC = min(texelColorRaw.r, min(texelColorRaw.g, texelColorRaw.b));
+        if (maxC - minC < 0.05) discard;
+        diffuseColor.a = 1.0;
+      #endif
+      `
+    );
+  };
+
+  mat.customProgramCacheKey = () => 'foliage_trunk_chromakey';
+  return mat;
 }
 
 // ── FoliageSystem class ──────────────────────────────────────
