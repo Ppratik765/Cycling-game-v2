@@ -212,11 +212,16 @@ uniform float uTime;
 }
 
 function createLeafMaterial(baseColor, type, uTimeRef) {
+  const leafTex = new THREE.TextureLoader().load('/textures/leaf_cluster_alpha.png');
+  leafTex.colorSpace = THREE.SRGBColorSpace;
+
   const mat = new THREE.MeshStandardMaterial({
     color: baseColor,
+    map: leafTex,
+    alphaTest: 0.35,
     roughness: 0.8,
     metalness: 0.0,
-    side: THREE.FrontSide, // Solid shapes don't need DoubleSide
+    side: THREE.DoubleSide,
   });
 
   mat.onBeforeCompile = (shader) => {
@@ -303,125 +308,6 @@ export class FoliageSystem {
 
   update(elapsedTime) {
     this.uTime.value = elapsedTime;
-  }
-
-  async populateChunkAsync(cx, cz, chunkSize, yieldFn) {
-    const key = `${cx},${cz}`;
-    this.removeChunk(key);
-
-    const worldOriginX = cx * chunkSize;
-    const worldOriginZ = cz * chunkSize;
-    const rng = mulberry32(chunkSeed(cx, cz));
-
-    const grassBuffer = new Float32Array(GRASS_PER_CHUNK * 16);
-    const grassColors = new Float32Array(GRASS_PER_CHUNK * 3);
-    const pineBuffer = new Float32Array(PINE_PER_CHUNK * 16);
-    const broadBuffer = new Float32Array(BROADLEAF_PER_CHUNK * 16);
-
-    let grassCount = 0;
-    let pineCount = 0;
-    let broadCount = 0;
-
-    const _grassColor = new THREE.Color();
-
-    for (let i = 0; i < GRASS_PER_CHUNK; i++) {
-      if (yieldFn && i % 4000 === 0) await yieldFn();
-      const localX = (rng() - 0.5) * chunkSize;
-      const localZ = (rng() - 0.5) * chunkSize;
-      const worldX = localX + worldOriginX;
-      const worldZ = localZ + worldOriginZ;
-      const dist = distToTrail(worldX, worldZ);
-      if (dist < TRAIL_CLEAR) continue;
-      const height = this.noiseGen.getHeight(worldX, worldZ);
-      const yRot = rng() * Math.PI * 2;
-      const s = 0.8 + rng() * 0.6;
-      this._mat4.compose(
-        this._pos.set(worldX, height, worldZ),
-        this._quat.setFromAxisAngle(this._up, yRot),
-        this._scale.set(s, s + rng() * 0.5, s)
-      );
-      this._mat4.toArray(grassBuffer, grassCount * 16);
-
-      const hue = 0.25 + rng() * 0.08;
-      const sat = 0.25 + rng() * 0.25;
-      const lightness = 0.18 + rng() * 0.14;
-      _grassColor.setHSL(hue, sat, lightness);
-      grassColors[grassCount * 3]     = _grassColor.r;
-      grassColors[grassCount * 3 + 1] = _grassColor.g;
-      grassColors[grassCount * 3 + 2] = _grassColor.b;
-
-      grassCount++;
-    }
-
-    if (yieldFn) await yieldFn();
-
-    for (let i = 0; i < PINE_PER_CHUNK; i++) {
-      const localX = (rng() - 0.5) * chunkSize;
-      const localZ = (rng() - 0.5) * chunkSize;
-      const worldX = localX + worldOriginX;
-      const worldZ = localZ + worldOriginZ;
-      const dist = distToTrail(worldX, worldZ);
-      if (dist < TRAIL_DENSE) continue;
-      const height = this.noiseGen.getHeight(worldX, worldZ);
-      const yRot = rng() * Math.PI * 2;
-      const s = 0.45 + rng() * 0.35;
-      this._mat4.compose(
-        this._pos.set(worldX, height, worldZ),
-        this._quat.setFromAxisAngle(this._up, yRot),
-        this._scale.set(s, s, s)
-      );
-      this._mat4.toArray(pineBuffer, pineCount * 16);
-      pineCount++;
-    }
-
-    if (yieldFn) await yieldFn();
-
-    for (let i = 0; i < BROADLEAF_PER_CHUNK; i++) {
-      const localX = (rng() - 0.5) * chunkSize;
-      const localZ = (rng() - 0.5) * chunkSize;
-      const worldX = localX + worldOriginX;
-      const worldZ = localZ + worldOriginZ;
-      const dist = distToTrail(worldX, worldZ);
-      if (dist < TRAIL_DENSE) continue;
-      const height = this.noiseGen.getHeight(worldX, worldZ);
-      const yRot = rng() * Math.PI * 2;
-      const s = 0.4 + rng() * 0.35;
-      this._mat4.compose(
-        this._pos.set(worldX, height, worldZ),
-        this._quat.setFromAxisAngle(this._up, yRot),
-        this._scale.set(s, s, s)
-      );
-      this._mat4.toArray(broadBuffer, broadCount * 16);
-      broadCount++;
-    }
-
-    if (yieldFn) await yieldFn();
-
-    const entry = {};
-    const addIM = (geo, mat, buffer, count, name, castShadow, colors) => {
-      if (count === 0) return;
-      const m = new THREE.InstancedMesh(geo, mat, count);
-      m.instanceMatrix.array.set(buffer.subarray(0, count * 16));
-      m.instanceMatrix.needsUpdate = true;
-      if (colors) {
-        m.instanceColor = new THREE.InstancedBufferAttribute(
-          new Float32Array(colors.subarray(0, count * 3)), 3
-        );
-      }
-      m.castShadow = castShadow;
-      m.receiveShadow = false;
-      m.frustumCulled = false;
-      this.scene.add(m);
-      entry[name] = m;
-    };
-
-    addIM(this._grassGeo,       this._grassMat,     grassBuffer, grassCount, 'grass',        false, grassColors);
-    addIM(this._pineCanopyGeo,  this._pineLeafMat,  pineBuffer,  pineCount,  'pineCanopy',   true);
-    addIM(this._pineTrunkGeo,   this._trunkMat,     pineBuffer,  pineCount,  'pineTrunk',    true);
-    addIM(this._broadCanopyGeo, this._broadLeafMat, broadBuffer, broadCount, 'broadCanopy',  true);
-    addIM(this._broadTrunkGeo,  this._trunkMat,     broadBuffer, broadCount, 'broadTrunk',   true);
-
-    this.chunkFoliage.set(key, entry);
   }
 
   populateChunk(cx, cz, chunkSize) {
