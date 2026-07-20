@@ -67,7 +67,7 @@ export class TerrainBackdrop {
     // Lit material so sunLight gives the ridgeline real shadow definition
     const mat = new THREE.MeshStandardMaterial({
       map: map,
-      color: 0x8a8a8a,     // Neutral grey tint to let the rock texture drive color
+      color: 0xa39281,     // Warm earthy tint to restore the brown mountain look
       roughness: 0.92,
       metalness: 0.0,
       side: THREE.BackSide,

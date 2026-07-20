@@ -8,7 +8,7 @@ import * as THREE from 'three';
 
 // ── Constants ────────────────────────────────────────────────
 
-const GRASS_PER_CHUNK       = 40000;
+const GRASS_PER_CHUNK       = 15000;
 const PINE_PER_CHUNK        = 40;
 const BROADLEAF_PER_CHUNK   = 20;
 
@@ -39,30 +39,40 @@ function chunkSeed(cx, cz) {
 
 // ── Geometry builders ────────────────────────────────────────
 
-/** Grass tuft: A thick cluster of 4 planes to simulate high density */
+/** Grass tuft: Efficient V-shape (2 planes) with upward normals for perfect terrain blending */
 function createGrassTuft() {
   const w = 0.12, h = 1.6;
   const planes = [];
   
-  // Create 4 planes rotated at 45 degree intervals (0, 45, 90, 135)
-  for (let i = 0; i < 4; i++) {
+  // Create 2 planes rotated at 90 degree intervals (0, 90) for a classic cross shape
+  for (let i = 0; i < 2; i++) {
     const plane = new THREE.PlaneGeometry(w * 2, h, 1, 3);
-    plane.rotateY((Math.PI / 4) * i);
+    plane.rotateY((Math.PI / 2) * i);
     
     // Add a slight lean to make the clump fan outward
-    const leanX = (i % 2 === 0 ? 0.15 : -0.15);
-    const leanZ = (i > 1 ? 0.15 : -0.15);
+    const leanX = (i === 0 ? 0.15 : -0.15);
     plane.rotateX(leanX);
-    plane.rotateZ(leanZ);
+    plane.rotateZ(0.15);
     
     plane.translate(0, h / 2, 0);
     planes.push(plane);
   }
   
-  return mergeGeometries(planes);
+  const merged = mergeGeometries(planes);
+  
+  // Override normals to point straight up (0, 1, 0)
+  // This AAA trick makes grass shade exactly like the terrain underneath it
+  const norms = merged.attributes.normal.array;
+  for (let i = 0; i < norms.length; i += 3) {
+    norms[i] = 0.0;
+    norms[i + 1] = 1.0;
+    norms[i + 2] = 0.0;
+  }
+  
+  return merged;
 }
 
-/** Layered pine canopy only (trunk is separate) */
+/** Layered pine canopy with fluffed normals */
 function createPineCanopy() {
   const cone1 = new THREE.ConeGeometry(3.0, 5.0, 6, 1);
   cone1.translate(0, 7.5, 0);
@@ -70,7 +80,21 @@ function createPineCanopy() {
   cone2.translate(0, 10.5, 0);
   const cone3 = new THREE.ConeGeometry(1.4, 3.0, 6, 1);
   cone3.translate(0, 13.0, 0);
-  return mergeGeometries([cone1, cone2, cone3]);
+  
+  const merged = mergeGeometries([cone1, cone2, cone3]);
+  
+  // Bend normals outwards and upwards to create soft, fluffy volumetric shading
+  const pos = merged.attributes.position.array;
+  const norms = merged.attributes.normal.array;
+  for (let i = 0; i < norms.length; i += 3) {
+    norms[i] = pos[i] * 0.6;
+    norms[i + 1] = 1.0; 
+    norms[i + 2] = pos[i + 2] * 0.6;
+    const len = Math.sqrt(norms[i]**2 + norms[i+1]**2 + norms[i+2]**2);
+    norms[i] /= len; norms[i+1] /= len; norms[i+2] /= len;
+  }
+  
+  return merged;
 }
 
 /** Pine trunk */
@@ -80,10 +104,23 @@ function createPineTrunk() {
   return trunk;
 }
 
-/** Broadleaf canopy only */
+/** Broadleaf canopy with spherical normals */
 function createBroadleafCanopy() {
   const canopy = new THREE.IcosahedronGeometry(4.0, 1);
+  canopy.computeVertexNormals();
   canopy.translate(0, 9.0, 0);
+  
+  // Override normals to be spherical, pointing outward from center (0, 9, 0)
+  const pos = canopy.attributes.position.array;
+  const norms = canopy.attributes.normal.array;
+  for (let i = 0; i < norms.length; i += 3) {
+    norms[i] = pos[i];
+    norms[i + 1] = pos[i + 1] - 9.0 + 1.0; // point slightly more upwards (+1.0 offset)
+    norms[i + 2] = pos[i + 2];
+    const len = Math.sqrt(norms[i]**2 + norms[i+1]**2 + norms[i+2]**2);
+    norms[i] /= len; norms[i+1] /= len; norms[i+2] /= len;
+  }
+  
   return canopy;
 }
 

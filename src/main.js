@@ -203,8 +203,8 @@ async function init() {
       chunkSize: 200,
     });
 
-    // Force initial 3x3 chunk generation
-    chunkManager.init(0, 0);
+    // Force initial 3x3 chunk generation asynchronously to keep UI responsive
+    await chunkManager.initAsync(0, 0, LoadingProgress.yieldToUI);
     progress.completeStep(stepTerrain);
 
     // ── Step 4: Foliage planted ───────────────────────────────

@@ -51,6 +51,21 @@ export class TerrainChunkManager {
     this._lastCZ = cz;
   }
 
+  /** Async force-spawn that yields to UI to prevent freezing animations */
+  async initAsync(focusX = 0, focusZ = 0, yieldFn = null) {
+    this.chunkQueue = [];
+    const cx = Math.round(focusX / this.chunkSize);
+    const cz = Math.round(focusZ / this.chunkSize);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        this._createChunk(cx + dx, cz + dz);
+        if (yieldFn) await yieldFn();
+      }
+    }
+    this._lastCX = cx;
+    this._lastCZ = cz;
+  }
+
   /**
    * Call each frame with the player's position.
    * Only repositions when the player crosses a chunk boundary.
