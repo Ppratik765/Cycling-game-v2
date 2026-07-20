@@ -202,7 +202,7 @@ export class TerrainChunkManager {
     );
     const collider = this.world.createCollider(colliderDesc, rigidBody);
 
-    const key = `${cx},${cz}`;
+    // key is passed as an argument
     this.chunks.set(key, { mesh, rigidBody, collider, cx, cz });
 
     // Yield to browser before foliage generation
