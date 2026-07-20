@@ -118,23 +118,82 @@ export class TerrainChunkManager {
   async _createChunkAsync(cx, cz, yieldFn) {
     const key = `${cx},${cz}`;
     if (this.chunks.has(key)) return;
-    let chunk;
-    if (this._pool.length > 0) {
-      chunk = this._pool.pop();
+
+    const size = this.chunkSize;
+    const segs = SEGMENTS;
+    const verts = segs + 1; // vertices per axis
+
+    const worldOriginX = cx * size;
+    const worldOriginZ = cz * size;
+
+    // Try to reuse a pooled chunk
+    const pooled = this._pool.pop();
+    let geo, mesh, heightData;
+
+    if (pooled) {
+      mesh = pooled.mesh;
+      geo = mesh.geometry;
+      this.world.removeCollider(pooled.collider, true);
+      this.world.removeRigidBody(pooled.rigidBody);
     } else {
-      chunk = this._buildNewChunk();
+      geo = new THREE.PlaneGeometry(size, size, segs, segs);
+      geo.rotateX(-Math.PI / 2); // Face +Y
+      mesh = new THREE.Mesh(geo, this.material);
+      mesh.receiveShadow = true;
+      mesh.castShadow = false;
+      this.scene.add(mesh);
     }
-    chunk.cx = cx;
-    chunk.cz = cz;
+
     if (yieldFn) await yieldFn();
-    this._updateChunkGeometry(chunk, cx, cz);
+
+    const posAttr = geo.attributes.position;
+    heightData = new Float32Array(verts * verts);
+
+    for (let i = 0; i < posAttr.count; i++) {
+      if (yieldFn && i % 4000 === 0) await yieldFn();
+      const localX = posAttr.getX(i);
+      const localZ = posAttr.getZ(i);
+
+      const worldX = localX + worldOriginX;
+      const worldZ = localZ + worldOriginZ;
+
+      const h = this.noise.getHeight(worldX, worldZ);
+      posAttr.setY(i, h);
+
+      const row = Math.floor(i / verts);
+      const col = i % verts;
+      heightData[col * verts + row] = h;
+    }
+
+    geo.computeVertexNormals();
+    posAttr.needsUpdate = true;
+    mesh.position.set(worldOriginX, 0, worldOriginZ);
+
     if (yieldFn) await yieldFn();
+
+    const R = this.RAPIER;
+    const bodyDesc = R.RigidBodyDesc.fixed().setTranslation(
+      worldOriginX,
+      0,
+      worldOriginZ
+    );
+    const rigidBody = this.world.createRigidBody(bodyDesc);
+
+    const colliderDesc = R.ColliderDesc.heightfield(
+      segs,
+      segs,
+      heightData,
+      { x: size, y: 1.0, z: size }
+    );
+    const collider = this.world.createCollider(colliderDesc, rigidBody);
+
+    this.chunks.set(key, { mesh, rigidBody, collider, cx, cz });
+
     if (this.foliage && this.foliage.populateChunkAsync) {
-      await this.foliage.populateChunkAsync(cx, cz, this.chunkSize, yieldFn);
+      await this.foliage.populateChunkAsync(cx, cz, size, yieldFn);
     } else if (this.foliage) {
-      this.foliage.populateChunk(cx, cz, this.chunkSize);
+      this.foliage.populateChunk(cx, cz, size);
     }
-    this.chunks.set(key, chunk);
   }
 
   _createChunk(cx, cz) {
