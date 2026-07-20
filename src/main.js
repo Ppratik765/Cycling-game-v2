@@ -100,7 +100,7 @@ async function init() {
 
     // ── Camera ────────────────────────────────────────────────
     const camera = new THREE.PerspectiveCamera(
-      98,  // Wide GoPro FOV
+      window.innerWidth < window.innerHeight ? 110 : 98,  // Wider FOV for mobile portrait mode
       window.innerWidth / window.innerHeight,
       0.1,
       2000
@@ -248,11 +248,13 @@ async function init() {
     // ── Window resize ─────────────────────────────────────────
     function onResize() {
       camera.aspect = window.innerWidth / window.innerHeight;
+      camera.fov = window.innerWidth < window.innerHeight ? 110 : 98; // Dynamically adjust FOV for portrait
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
       composer.setSize(window.innerWidth, window.innerHeight);
     }
     window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', () => setTimeout(onResize, 100)); // Ensure layout settles before resizing
 
     // ── Animation Loop ────────────────────────────────────────
     const timer = new THREE.Timer();
