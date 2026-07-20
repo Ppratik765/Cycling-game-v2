@@ -85,15 +85,14 @@ function createPineCanopy() {
   const cone3 = new THREE.ConeGeometry(2.0, 4.5, 6, 1);
   cone3.translate(0, 18.75, 0);
   
-  const cone4 = new THREE.ConeGeometry(4.0, 6.5, 6, 1);
-  cone4.rotateX(0.1);
-  cone4.translate(0.5, 11.5, -0.5);
-
-  const cone5 = new THREE.ConeGeometry(3.0, 5.0, 6, 1);
-  cone5.rotateZ(-0.1);
-  cone5.translate(-0.5, 16.0, 0.5);
+  const outer = mergeGeometries([cone1, cone2, cone3]);
   
-  const merged = mergeGeometries([cone1, cone2, cone3, cone4, cone5]);
+  // Inner layer to fill in transparent gaps
+  const inner = outer.clone();
+  inner.scale(0.7, 0.9, 0.7); 
+  inner.rotateY(Math.PI / 4);
+  
+  const merged = mergeGeometries([outer, inner]);
   
   // Bend normals outwards and upwards to create soft, fluffy volumetric shading
   const pos = merged.attributes.position.array;
@@ -118,23 +117,24 @@ function createPineTrunk() {
 
 /** Broadleaf canopy with spherical normals */
 function createBroadleafCanopy() {
-  const c1 = new THREE.IcosahedronGeometry(6.5, 1);
-  c1.translate(0, 14.0, 0);
-
-  const c2 = new THREE.IcosahedronGeometry(5.0, 1);
-  c2.translate(3.0, 12.0, 0.0);
-
-  const c3 = new THREE.IcosahedronGeometry(5.0, 1);
-  c3.translate(-3.0, 13.0, 2.0);
-
-  const c4 = new THREE.IcosahedronGeometry(5.0, 1);
-  c4.translate(-1.0, 15.0, -3.5);
+  const outer = new THREE.IcosahedronGeometry(6.5, 1);
+  outer.translate(0, 14.0, 0);
   
-  const canopy = mergeGeometries([c1, c2, c3, c4]);
+  const inner1 = new THREE.IcosahedronGeometry(5.2, 1);
+  inner1.rotateY(Math.PI / 3);
+  inner1.rotateX(Math.PI / 4);
+  inner1.translate(0, 14.0, 0);
   
-  // Override normals to be spherical, pointing outward from center (0, 9, 0)
-  const pos = canopy.attributes.position.array;
-  const norms = canopy.attributes.normal.array;
+  const inner2 = new THREE.IcosahedronGeometry(3.5, 0);
+  inner2.rotateY(Math.PI / 6);
+  inner2.rotateZ(Math.PI / 4);
+  inner2.translate(0, 14.0, 0);
+
+  const merged = mergeGeometries([outer, inner1, inner2]);
+  
+  // Override normals to be spherical, pointing outward from center (0, 14, 0)
+  const pos = merged.attributes.position.array;
+  const norms = merged.attributes.normal.array;
   for (let i = 0; i < norms.length; i += 3) {
     norms[i] = pos[i];
     norms[i + 1] = pos[i + 1] - 14.0 + 1.0; // point slightly more upwards (+1.0 offset)
@@ -143,7 +143,7 @@ function createBroadleafCanopy() {
     norms[i] /= len; norms[i+1] /= len; norms[i+2] /= len;
   }
   
-  return canopy;
+  return merged;
 }
 
 /** Broadleaf trunk */
