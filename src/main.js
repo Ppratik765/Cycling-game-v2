@@ -57,8 +57,8 @@ async function init() {
 
   // ── Scene ─────────────────────────────────────────────────
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog('#b5b9bc', 120, 190);
-  scene.background = new THREE.Color('#b5b9bc');
+  scene.fog = new THREE.Fog('#b8bcc0', 120, 190);
+  scene.background = new THREE.Color('#b8bcc0');
 
   // ── Camera ────────────────────────────────────────────────
   const camera = new THREE.PerspectiveCamera(
@@ -96,6 +96,12 @@ async function init() {
     hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
     scene.background = hdrTexture;
     scene.environment = hdrTexture;
+
+    // Sync fog color to match the HDRI's horizon tone (eyeballed against overcast_sky_1.hdr)
+    const hdriHorizonColor = new THREE.Color(0xb8bcc0);
+    scene.fog.color.copy(hdriHorizonColor);
+    scene.background; // background is now the HDRI, fog blends into its horizon
+    backdrop.syncFogColor(hdriHorizonColor);
   });
 
   // ── Post-processing ───────────────────────────────────────

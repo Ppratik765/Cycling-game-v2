@@ -1,7 +1,8 @@
 /* ============================================================
  *  TerrainBackdrop.js
  *  A large cylinder with noise-displaced top rim to simulate
- *  distant mountains. Loads its own textures independently.
+ *  distant mountains. Uses rock texture + lit material with
+ *  distance-based atmospheric haze synced to scene fog color.
  * ============================================================ */
 
 import * as THREE from 'three';
@@ -52,39 +53,65 @@ export class TerrainBackdrop {
     geo.computeVertexNormals();
     posAttr.needsUpdate = true;
 
+    // ── Rock cliff texture (replaces the old grass texture) ──
     const texLoader = new THREE.TextureLoader();
-    const map = texLoader.load('/textures/ground_grass_diffuse.jpg');
+    const map = texLoader.load('/textures/rock_cliff_diffuse.png');
     map.wrapS = THREE.RepeatWrapping;
     map.wrapT = THREE.RepeatWrapping;
-    map.repeat.set(24, 4); // Scaled down so texture details are larger and more visible from afar
+    map.repeat.set(16, 6); // Rock texture repeat for the large cylinder
     map.colorSpace = THREE.SRGBColorSpace;
 
-    // Use BasicMaterial so it doesn't require lighting to be visible at extreme distances
-    const mat = new THREE.MeshBasicMaterial({
+    // ── Fog color uniform — synced from main.js after HDRI loads ──
+    this._fogColorUniform = { value: new THREE.Color(scene.fog ? scene.fog.color : 0xb5b9bc) };
+
+    // Lit material so sunLight gives the ridgeline real shadow definition
+    const mat = new THREE.MeshStandardMaterial({
       map: map,
+      color: 0x8a8a8a,     // Neutral grey tint to let the rock texture drive color
+      roughness: 0.92,
+      metalness: 0.0,
       side: THREE.BackSide,
-      fog: false, // Disable built-in distance fog
+      fog: true,            // Participate in scene.fog instead of faking it
     });
 
-    // Inject a fixed haze to fake atmospheric perspective without completely hiding the texture
+    // Inject distance-based atmospheric haze in fragment shader
     mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uFogColor = this._fogColorUniform;
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <common>',
+        `#include <common>
+uniform vec3 uFogColor;
+`
+      );
+
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <dithering_fragment>',
         `
         #include <dithering_fragment>
-        // #b5b9bc converted to linear RGB approximately
-        vec3 hazeColor = vec3(0.71, 0.725, 0.737); 
-        // Mix 40% haze, leaving 60% of the mountain texture visible so it pops more
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeColor, 0.40);
+        // Distance-based atmospheric haze — nearer base is clearer, upper ridgeline fades
+        float vHeight = vViewPosition.y;
+        float distFactor = clamp(length(vViewPosition) / 900.0, 0.0, 1.0);
+        float heightFade = smoothstep(-100.0, 250.0, vHeight) * 0.2;
+        float hazeMix = distFactor * 0.55 + heightFade;
+        hazeMix = clamp(hazeMix, 0.0, 0.75);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor, hazeMix);
         `
       );
     };
+
+    mat.customProgramCacheKey = () => 'terrain_backdrop_rock_haze';
 
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.receiveShadow = false;
     this.mesh.castShadow    = false;
     this.mesh.position.y    = -50; // Bury the base so no gap appears below terrain
     this.scene.add(this.mesh);
+  }
+
+  /** Sync the haze color with the current scene fog color */
+  syncFogColor(color) {
+    this._fogColorUniform.value.copy(color);
   }
 
   /** Call each frame — follows camera X, Z for parallax. */
