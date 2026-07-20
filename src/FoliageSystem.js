@@ -170,10 +170,16 @@ uniform float uTime;
 }
 
 function createLeafMaterial(baseColor, type, uTimeRef) {
+  const leafTex = new THREE.TextureLoader().load('/textures/leaf_cluster_alpha.png');
+  leafTex.colorSpace = THREE.SRGBColorSpace;
+
   const mat = new THREE.MeshStandardMaterial({
     color: baseColor,
+    map: leafTex,
+    alphaTest: 0.35,
     roughness: 0.8,
     metalness: 0.0,
+    side: THREE.DoubleSide,
   });
 
   mat.onBeforeCompile = (shader) => {
@@ -212,6 +218,21 @@ uniform float uTime;
   return mat;
 }
 
+function createTrunkMaterial() {
+  const barkTex = new THREE.TextureLoader().load('/textures/bark_diffuse.png');
+  barkTex.colorSpace = THREE.SRGBColorSpace;
+  barkTex.wrapS = THREE.RepeatWrapping;
+  barkTex.wrapT = THREE.RepeatWrapping;
+  barkTex.repeat.set(1, 2); // Stretch bark vertically along the cylinder
+
+  return new THREE.MeshStandardMaterial({
+    color: 0x5a4a3a, // Slightly lightened to let bark texture show through
+    map: barkTex,
+    roughness: 0.95,
+    metalness: 0.0,
+  });
+}
+
 // ── FoliageSystem class ──────────────────────────────────────
 
 export class FoliageSystem {
@@ -229,13 +250,9 @@ export class FoliageSystem {
 
     // Shared materials
     this._grassMat      = createGrassMaterial(this.uTime);
-    this._pineLeafMat   = createLeafMaterial(0x2d5a27, 'pine', this.uTime);
-    this._broadLeafMat  = createLeafMaterial(0x3d7a32, 'broadleaf', this.uTime);
-    this._trunkMat      = new THREE.MeshStandardMaterial({
-      color: 0x4a3728, // Brown bark
-      roughness: 0.95,
-      metalness: 0.0,
-    });
+    this._pineLeafMat   = createLeafMaterial(0x3a6630, 'pine', this.uTime);    // Desaturated pine green
+    this._broadLeafMat  = createLeafMaterial(0x4a7a3a, 'broadleaf', this.uTime); // Desaturated broadleaf
+    this._trunkMat      = createTrunkMaterial();
 
     this.chunkFoliage = new Map();
 
