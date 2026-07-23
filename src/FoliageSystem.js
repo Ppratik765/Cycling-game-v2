@@ -44,20 +44,35 @@ function createGrassTuft() {
   const w = 0.12, h = 1.6;
   const planes = [];
 
-  // Create 4 planes rotated at 45 degree intervals for a dense, thick tuft
-  for (let i = 0; i < 4; i++) {
-    const plane = new THREE.PlaneGeometry(w * 2, h, 1, 3);
+  // Create a 4-strand tuft design (4 pointed star on top)
+  const numStrands = 4;
+  for (let i = 0; i < numStrands; i++) {
+    const plane = new THREE.PlaneGeometry(w * 1.5, h, 1, 3);
 
-    // Deliberately delete UVs so the grass acts as a solid colored plane (old aesthetic)
+    // Deliberately delete UVs so the grass acts as a solid colored plane
     plane.deleteAttribute('uv');
 
-    plane.rotateY((Math.PI / 4) * i);
+    // Taper the top of the grass strand so it looks like a pointed blade
+    const pos = plane.attributes.position.array;
+    for (let j = 0; j < pos.length; j += 3) {
+      const y = pos[j + 1];
+      // Normalize height from 0.0 (bottom) to 1.0 (top)
+      const hNorm = (y + h / 2) / h;
+      // Shrink the width (X) as it gets higher to form a blade tip
+      pos[j] *= (1.0 - hNorm * 0.95); 
+    }
 
-    // Add a slight lean to make the clump fan outward
-    const leanX = (i % 2 === 0 ? 0.15 : -0.15);
-    plane.rotateX(leanX);
-    plane.rotateZ((Math.random() - 0.5) * 0.2);
+    // Spread strands out in a circle
+    const angle = (Math.PI * 2 / numStrands) * i;
+    plane.rotateY(angle);
 
+    // Lean the strand outwards from the center to create volume
+    plane.rotateX(0.35);
+    
+    // Add a slight random twist
+    plane.rotateZ((Math.random() - 0.5) * 0.3);
+
+    // Shift up so the base is at the origin
     plane.translate(0, h / 2, 0);
     planes.push(plane);
   }
