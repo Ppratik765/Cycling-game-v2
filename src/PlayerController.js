@@ -105,9 +105,15 @@ export class PlayerController {
 
   _updateMovement(delta) {
     // ── Lean & Yaw ────────────────────────────────────────────
+    // Normalized speed (0.0 to 1.0)
+    const speedFactor = Math.min(Math.abs(this.currentSpeed) / MAX_SPEED, 1.0);
+
+    // Lean increases as speed increases. Minimum 10% lean so it doesn't look stiff.
+    const maxLean = (LEAN_MAX_DEG * (Math.PI / 180)) * Math.max(0.1, speedFactor);
+
     let targetLean = 0;
-    if (this.keys.a) targetLean =  LEAN_MAX_DEG * (Math.PI / 180);
-    if (this.keys.d) targetLean = -LEAN_MAX_DEG * (Math.PI / 180);
+    if (this.keys.a) targetLean =  maxLean;
+    if (this.keys.d) targetLean = -maxLean;
 
     this.currentLean = THREE.MathUtils.lerp(
       this.currentLean,
@@ -115,9 +121,14 @@ export class PlayerController {
       1.0 - Math.exp(-LEAN_SPEED * delta)
     );
 
-    // Yaw tied to lean angle — the more you lean, the faster you turn
-    const leanNorm = this.currentLean / (LEAN_MAX_DEG * (Math.PI / 180));
-    this.yaw += leanNorm * TURN_RATE * delta;
+    // Normalize current lean against the current max lean (yields -1.0 to 1.0)
+    const leanNorm = maxLean > 0 ? (this.currentLean / maxLean) : 0;
+    
+    // Turn rate scales with speed (stopped = 0 turn).
+    // Multiply base TURN_RATE so at max speed it turns quickly as requested.
+    const dynamicTurnRate = TURN_RATE * 1.8 * speedFactor;
+    
+    this.yaw += leanNorm * dynamicTurnRate * delta;
 
     // ── Forward / Brake / Reverse ─────────────────────────────
     const vel = this.rigidBody.linvel();
