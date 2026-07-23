@@ -9,14 +9,14 @@ import * as THREE from 'three';
 // ── Tuning Constants ────────────────────────────────────────
 
 const MAX_SPEED         = 26.0;   // m/s forward
-const ACCELERATION      = 8.0;    // m/s² when pedalling (W)
+const ACCELERATION      = 10.0;   // m/s² when pedalling (W)
 const BRAKE_DECEL       = 20.0;   // m/s² braking force (S while moving fwd)
 const REVERSE_MAX_SPEED = 6.0;    // m/s reverse
 const REVERSE_ACCEL     = 4.0;    // m/s² reverse acceleration
 
 const LEAN_MAX_DEG      = 15.0;   // max visual roll in degrees (reduced for less extreme tilt)
-const LEAN_SPEED        = 1.5;    // lerp speed for lean (reduced for smoother transition)
-const TURN_RATE         = 0.85;   // yaw rate multiplier (reduced for realistic carving)
+const LEAN_SPEED        = 2.0;    // lerp speed for lean (reduced for smoother transition)
+const TURN_RATE         = 1.0;    // yaw rate multiplier (reduced for realistic carving)
 
 const CAM_HEIGHT        = 2.6;    // Y offset above collider centre (GoPro mount)
 const CAM_SMOOTH_POS    = 6.0;    // position spring stiffness
@@ -126,7 +126,7 @@ export class PlayerController {
     
     // Turn rate scales with speed (stopped = 0 turn).
     // Multiply base TURN_RATE by a smaller factor so at max speed it turns smoothly without twitching.
-    const dynamicTurnRate = TURN_RATE * 1.2 * speedFactor;
+    const dynamicTurnRate = TURN_RATE * 1.5 * speedFactor;
     
     this.yaw += leanNorm * dynamicTurnRate * delta;
 
