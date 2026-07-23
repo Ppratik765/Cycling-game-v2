@@ -8,12 +8,12 @@ import * as THREE from 'three';
 
 // ── Constants ────────────────────────────────────────────────
 
-const GRASS_PER_CHUNK       = 23000;
-const PINE_PER_CHUNK        = 40;
-const BROADLEAF_PER_CHUNK   = 20;
+const GRASS_PER_CHUNK = 23000;
+const PINE_PER_CHUNK = 40;
+const BROADLEAF_PER_CHUNK = 20;
 
-const TRAIL_CLEAR    = 6.0;
-const TRAIL_DENSE    = 15.0;
+const TRAIL_CLEAR = 6.0;
+const TRAIL_DENSE = 15.0;
 
 // ── Trail equation (must match CustomSplatShader.js) ─────────
 function trailCurveX(z) {
@@ -43,27 +43,27 @@ function chunkSeed(cx, cz) {
 function createGrassTuft() {
   const w = 0.12, h = 1.6;
   const planes = [];
-  
+
   // Create 2 planes rotated at 90 degree intervals (0, 90) for a classic cross shape
   for (let i = 0; i < 2; i++) {
     const plane = new THREE.PlaneGeometry(w * 2, h, 1, 3);
-    
+
     // Deliberately delete UVs so the grass acts as a solid colored plane (old aesthetic)
     plane.deleteAttribute('uv');
-    
+
     plane.rotateY((Math.PI / 2) * i);
-    
+
     // Add a slight lean to make the clump fan outward
     const leanX = (i === 0 ? 0.15 : -0.15);
     plane.rotateX(leanX);
     plane.rotateZ(0.15);
-    
+
     plane.translate(0, h / 2, 0);
     planes.push(plane);
   }
-  
+
   const merged = mergeGeometries(planes);
-  
+
   // Override normals to point straight up (0, 1, 0)
   // This AAA trick makes grass shade exactly like the terrain underneath it
   const norms = merged.attributes.normal.array;
@@ -72,22 +72,22 @@ function createGrassTuft() {
     norms[i + 1] = 1.0;
     norms[i + 2] = 0.0;
   }
-  
+
   return merged;
 }
 
 /** Layered pine canopy with fluffed normals */
 function createPineCanopy() {
   const planes = [];
-  
+
   const addLayer = (y, w, h, rotationOffset) => {
     for (let i = 0; i < 3; i++) {
       const plane = new THREE.PlaneGeometry(w, h, 1, 1);
       plane.rotateY((Math.PI / 3) * i + rotationOffset);
-      
+
       // Slight pitch to make branches droop naturally
-      plane.rotateX(0.15); 
-      
+      plane.rotateX(0.15);
+
       plane.translate(0, y, 0);
       planes.push(plane);
     }
@@ -98,20 +98,20 @@ function createPineCanopy() {
   addLayer(17.0, 7.5, 6.0, 0.5);
   addLayer(21.0, 5.5, 5.0, 1.0);
   addLayer(24.5, 3.5, 4.0, 1.5);
-  
+
   const merged = mergeGeometries(planes);
-  
+
   // Bend normals outwards and upwards to create soft, fluffy volumetric shading
   const pos = merged.attributes.position.array;
   const norms = merged.attributes.normal.array;
   for (let i = 0; i < norms.length; i += 3) {
     norms[i] = pos[i] * 0.6;
-    norms[i + 1] = 1.0; 
+    norms[i + 1] = 1.0;
     norms[i + 2] = pos[i + 2] * 0.6;
-    const len = Math.sqrt(norms[i]**2 + norms[i+1]**2 + norms[i+2]**2);
-    norms[i] /= len; norms[i+1] /= len; norms[i+2] /= len;
+    const len = Math.sqrt(norms[i] ** 2 + norms[i + 1] ** 2 + norms[i + 2] ** 2);
+    norms[i] /= len; norms[i + 1] /= len; norms[i + 2] /= len;
   }
-  
+
   return merged;
 }
 
@@ -125,16 +125,16 @@ function createPineTrunk() {
 /** Broadleaf canopy with spherical normals */
 function createBroadleafCanopy() {
   const planes = [];
-  
+
   const addCluster = (x, y, z, size, rotOffset) => {
     for (let i = 0; i < 3; i++) {
       const plane = new THREE.PlaneGeometry(size, size, 1, 1);
       plane.rotateY((Math.PI / 3) * i + rotOffset);
-      
+
       // Randomize pitch/roll slightly for chaotic, organic leaves
       plane.rotateX((Math.random() - 0.5) * 0.5);
       plane.rotateZ((Math.random() - 0.5) * 0.5);
-      
+
       plane.translate(x, y, z);
       planes.push(plane);
     }
@@ -142,19 +142,19 @@ function createBroadleafCanopy() {
 
   // Central core
   addCluster(0, 18.5, 0, 13.0, 0);
-  
+
   // Surrounding fluffy clusters
   const r = 4.0;
   addCluster(r, 17.5, 0, 9.0, 0.5);
   addCluster(-r, 17.5, 0, 9.0, 1.0);
   addCluster(0, 17.5, r, 9.0, 1.5);
   addCluster(0, 17.5, -r, 9.0, 2.0);
-  
+
   // Top cluster
   addCluster(0, 22.5, 0, 10.0, 2.5);
-  
+
   const merged = mergeGeometries(planes);
-  
+
   // Override normals to be spherical, pointing outward from center (0, 14, 0)
   const pos = merged.attributes.position.array;
   const norms = merged.attributes.normal.array;
@@ -162,10 +162,10 @@ function createBroadleafCanopy() {
     norms[i] = pos[i];
     norms[i + 1] = pos[i + 1] - 18.5 + 1.0; // point slightly more upwards (+1.0 offset)
     norms[i + 2] = pos[i + 2];
-    const len = Math.sqrt(norms[i]**2 + norms[i+1]**2 + norms[i+2]**2);
-    norms[i] /= len; norms[i+1] /= len; norms[i+2] /= len;
+    const len = Math.sqrt(norms[i] ** 2 + norms[i + 1] ** 2 + norms[i + 2] ** 2);
+    norms[i] /= len; norms[i + 1] /= len; norms[i + 2] /= len;
   }
-  
+
   return merged;
 }
 
@@ -308,7 +308,7 @@ uniform float uTime;
         vec4 texelColorRaw = texture2D( map, vMapUv );
         float maxC = max(texelColorRaw.r, max(texelColorRaw.g, texelColorRaw.b));
         float minC = min(texelColorRaw.r, min(texelColorRaw.g, texelColorRaw.b));
-        if (maxC - minC < 0.15) discard;
+        if (maxC - minC < 0.065) discard;
         diffuseColor.a = 1.0;
       #endif
       `
@@ -326,12 +326,33 @@ function createTrunkMaterial() {
   barkTex.wrapT = THREE.RepeatWrapping;
   barkTex.repeat.set(1, 2); // Stretch bark vertically along the cylinder
 
-  return new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshStandardMaterial({
     color: 0x5a4a3a, // Slightly lightened to let bark texture show through
     map: barkTex,
+    alphaTest: 0.1,  // Enable alphatest block processing
     roughness: 0.95,
     metalness: 0.0,
   });
+
+  mat.onBeforeCompile = (shader) => {
+    // AI Chroma-Key: Discards grey/white/black backgrounds based on raw texture color
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <alphatest_fragment>',
+      `
+      #include <alphatest_fragment>
+      #ifdef USE_MAP
+        vec4 texelColorRaw = texture2D( map, vMapUv );
+        float maxC = max(texelColorRaw.r, max(texelColorRaw.g, texelColorRaw.b));
+        float minC = min(texelColorRaw.r, min(texelColorRaw.g, texelColorRaw.b));
+        if (maxC - minC < 0.065) discard;
+        diffuseColor.a = 1.0;
+      #endif
+      `
+    );
+  };
+
+  mat.customProgramCacheKey = () => 'foliage_trunk';
+  return mat;
 }
 
 // ── FoliageSystem class ──────────────────────────────────────
@@ -343,17 +364,17 @@ export class FoliageSystem {
     this.uTime = { value: 0.0 };
 
     // Shared geometries
-    this._grassGeo       = createGrassTuft();
-    this._pineCanopyGeo  = createPineCanopy();
-    this._pineTrunkGeo   = createPineTrunk();
+    this._grassGeo = createGrassTuft();
+    this._pineCanopyGeo = createPineCanopy();
+    this._pineTrunkGeo = createPineTrunk();
     this._broadCanopyGeo = createBroadleafCanopy();
-    this._broadTrunkGeo  = createBroadleafTrunk();
+    this._broadTrunkGeo = createBroadleafTrunk();
 
     // Shared materials
-    this._grassMat      = createGrassMaterial(this.uTime);
-    this._pineLeafMat   = createLeafMaterial(0x3a6630, 'pine', this.uTime);    // Desaturated pine green
-    this._broadLeafMat  = createLeafMaterial(0x4a7a3a, 'broadleaf', this.uTime); // Desaturated broadleaf
-    this._trunkMat      = createTrunkMaterial();
+    this._grassMat = createGrassMaterial(this.uTime);
+    this._pineLeafMat = createLeafMaterial(0x3a6630, 'pine', this.uTime);    // Desaturated pine green
+    this._broadLeafMat = createLeafMaterial(0x4a7a3a, 'broadleaf', this.uTime); // Desaturated broadleaf
+    this._trunkMat = createTrunkMaterial();
 
     this.chunkFoliage = new Map();
 
@@ -397,7 +418,7 @@ export class FoliageSystem {
       const worldZ = localZ + worldOriginZ;
       const dist = distToTrail(worldX, worldZ);
       if (dist < TRAIL_CLEAR) continue;
-      
+
       const height = this.noiseGen.getHeight(worldX, worldZ);
       const yRot = rng() * Math.PI * 2;
       const s = 0.8 + rng() * 0.6;
@@ -412,12 +433,12 @@ export class FoliageSystem {
       const sat = 0.25 + rng() * 0.25;
       const lightness = 0.18 + rng() * 0.14;
       _grassColor.setHSL(hue, sat, lightness);
-      grassColors[grassCount * 3]     = _grassColor.r;
+      grassColors[grassCount * 3] = _grassColor.r;
       grassColors[grassCount * 3 + 1] = _grassColor.g;
       grassColors[grassCount * 3 + 2] = _grassColor.b;
 
       grassCount++;
-      
+
       // Yield every 4000 instances to prevent main thread blocking (frame drops)
       if (i % 4000 === 0 && i !== 0) {
         await new Promise(r => setTimeout(r, 0));
@@ -443,7 +464,7 @@ export class FoliageSystem {
       this._mat4.toArray(pineBuffer, pineCount * 16);
       pineCount++;
     }
-    
+
     await new Promise(r => setTimeout(r, 0));
 
     // ── Broadleaf trees ───────────────────────────────────────
@@ -465,7 +486,7 @@ export class FoliageSystem {
       this._mat4.toArray(broadBuffer, broadCount * 16);
       broadCount++;
     }
-    
+
     await new Promise(r => setTimeout(r, 0));
 
     this._createInstancedMeshes(cx, cz, entry => {
@@ -517,7 +538,7 @@ export class FoliageSystem {
       const sat = 0.25 + rng() * 0.25;           // Desaturated: 25%–50%
       const lightness = 0.18 + rng() * 0.14;     // Dark: 18%–32%
       _grassColor.setHSL(hue, sat, lightness);
-      grassColors[grassCount * 3]     = _grassColor.r;
+      grassColors[grassCount * 3] = _grassColor.r;
       grassColors[grassCount * 3 + 1] = _grassColor.g;
       grassColors[grassCount * 3 + 2] = _grassColor.b;
 
@@ -591,11 +612,11 @@ export class FoliageSystem {
       entry[name] = m;
     };
 
-    addIM(this._grassGeo,       this._grassMat,     grassBuffer, grassCount, 'grass',        false, grassColors);
-    addIM(this._pineCanopyGeo,  this._pineLeafMat,  pineBuffer,  pineCount,  'pineCanopy',   true);
-    addIM(this._pineTrunkGeo,   this._trunkMat,     pineBuffer,  pineCount,  'pineTrunk',    true);
-    addIM(this._broadCanopyGeo, this._broadLeafMat, broadBuffer, broadCount, 'broadCanopy',  true);
-    addIM(this._broadTrunkGeo,  this._trunkMat,     broadBuffer, broadCount, 'broadTrunk',   true);
+    addIM(this._grassGeo, this._grassMat, grassBuffer, grassCount, 'grass', false, grassColors);
+    addIM(this._pineCanopyGeo, this._pineLeafMat, pineBuffer, pineCount, 'pineCanopy', true);
+    addIM(this._pineTrunkGeo, this._trunkMat, pineBuffer, pineCount, 'pineTrunk', true);
+    addIM(this._broadCanopyGeo, this._broadLeafMat, broadBuffer, broadCount, 'broadCanopy', true);
+    addIM(this._broadTrunkGeo, this._trunkMat, broadBuffer, broadCount, 'broadTrunk', true);
 
     saveEntry(entry);
   }
