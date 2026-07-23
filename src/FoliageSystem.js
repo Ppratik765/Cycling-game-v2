@@ -39,25 +39,39 @@ function chunkSeed(cx, cz) {
 
 // ── Geometry builders ────────────────────────────────────────
 
-/** Grass tuft: Efficient V-shape (2 planes) with upward normals for perfect terrain blending */
 function createGrassTuft() {
-  const w = 0.12, h = 1.6;
+  const w = 0.15, h = 1.4;
   const planes = [];
 
-  // Create 2 planes rotated at 90 degree intervals (0, 90) for a classic cross shape
-  for (let i = 0; i < 2; i++) {
-    const plane = new THREE.PlaneGeometry(w * 2, h, 1, 3);
+  // Create a 5-strand tuft design
+  const numStrands = 5;
+  for (let i = 0; i < numStrands; i++) {
+    const plane = new THREE.PlaneGeometry(w, h, 1, 3);
 
-    // Deliberately delete UVs so the grass acts as a solid colored plane (old aesthetic)
+    // Deliberately delete UVs so the grass acts as a solid colored geometry
     plane.deleteAttribute('uv');
 
-    plane.rotateY((Math.PI / 2) * i);
+    // Taper the top of the grass strand so it looks pointed
+    const pos = plane.attributes.position.array;
+    for (let j = 0; j < pos.length; j += 3) {
+      const y = pos[j + 1];
+      // Normalize height from 0.0 (bottom) to 1.0 (top)
+      const hNorm = (y + h / 2) / h;
+      // Shrink the width (X) as it gets higher to form a blade
+      pos[j] *= (1.0 - hNorm * 0.9); 
+    }
 
-    // Add a slight lean to make the clump fan outward
-    const leanX = (i === 0 ? 0.15 : -0.15);
-    plane.rotateX(leanX);
-    plane.rotateZ(0.15);
+    // Spread strands out in a circle
+    const angle = (Math.PI * 2 / numStrands) * i;
+    plane.rotateY(angle);
 
+    // Lean the strand outwards from the center
+    plane.rotateX(0.4);
+    
+    // Add a slight random twist
+    plane.rotateZ((Math.random() - 0.5) * 0.4);
+
+    // Shift up so the base is at the origin
     plane.translate(0, h / 2, 0);
     planes.push(plane);
   }
