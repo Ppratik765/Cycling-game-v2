@@ -308,7 +308,7 @@ uniform float uTime;
         vec4 texelColorRaw = texture2D( map, vMapUv );
         float maxC = max(texelColorRaw.r, max(texelColorRaw.g, texelColorRaw.b));
         float minC = min(texelColorRaw.r, min(texelColorRaw.g, texelColorRaw.b));
-        if (maxC - minC < 0.05) discard;
+        if (maxC - minC < 0.15) discard;
         diffuseColor.a = 1.0;
       #endif
       `
