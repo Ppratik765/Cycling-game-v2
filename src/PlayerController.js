@@ -9,7 +9,7 @@ import * as THREE from 'three';
 // ── Tuning Constants ────────────────────────────────────────
 
 const MAX_SPEED         = 26.0;   // m/s forward
-const ACCELERATION      = 12.0;   // m/s² when pedalling (W)
+const ACCELERATION      = 8.0;    // m/s² when pedalling (W)
 const BRAKE_DECEL       = 20.0;   // m/s² braking force (S while moving fwd)
 const REVERSE_MAX_SPEED = 6.0;    // m/s reverse
 const REVERSE_ACCEL     = 4.0;    // m/s² reverse acceleration
@@ -137,8 +137,11 @@ export class PlayerController {
     let targetAccel = 0;
 
     if (this.keys.w) {
-      // Pedal: accelerate toward max speed
-      targetAccel = ACCELERATION;
+      // Pedal: accelerate toward max speed with simulated air resistance (drag)
+      // Acceleration drops quadratically as you approach MAX_SPEED
+      const speedRatio = Math.max(0, this.currentSpeed) / MAX_SPEED;
+      const drag = Math.pow(speedRatio, 2);
+      targetAccel = ACCELERATION * Math.max(0, 1.0 - drag);
     } else if (this.keys.s) {
       if (this.currentSpeed > 0.5) {
         // Braking while moving forward
