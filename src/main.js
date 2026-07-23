@@ -21,7 +21,6 @@ import {
   SSAOEffect,
   VignetteEffect,
   NoiseEffect,
-  SMAAEffect,
   BlendFunction
 } from 'postprocessing';
 
@@ -164,7 +163,7 @@ async function init() {
     progress.completeStep(stepSkybox);
 
     // ── Post-processing ───────────────────────────────────────
-    const composer = new EffectComposer(renderer);
+    const composer = new EffectComposer(renderer, { multisampling: 2 });
     composer.addPass(new RenderPass(scene, camera));
 
     const ssaoEffect = new SSAOEffect(camera, scene.background, {
@@ -173,9 +172,7 @@ async function init() {
       luminanceInfluence: 0.6,
     });
     const vignetteEffect = new VignetteEffect({ darkness: 0.4, offset: 0.3 });
-    const smaaEffect = new SMAAEffect();
-
-    const effectPass = new EffectPass(camera, ssaoEffect, vignetteEffect, smaaEffect);
+    const effectPass = new EffectPass(camera, ssaoEffect, vignetteEffect);
     composer.addPass(effectPass);
 
     // ── Splat Material ────────────────────────────────────────
