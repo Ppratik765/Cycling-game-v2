@@ -94,10 +94,10 @@ function createPineCanopy() {
   };
 
   // Stack 4 layers of decreasing size to form a pine profile
-  addLayer(13.0, 9.5, 7.0, 0);
-  addLayer(17.0, 7.5, 6.0, 0.5);
-  addLayer(21.0, 5.5, 5.0, 1.0);
-  addLayer(24.5, 3.5, 4.0, 1.5);
+  addLayer(13.0, 15.0, 8.0, 0);
+  addLayer(17.0, 11.5, 7.0, 0.5);
+  addLayer(21.0, 8.5, 6.0, 1.0);
+  addLayer(24.5, 5.5, 5.0, 1.5);
   
   const merged = mergeGeometries(planes);
   
