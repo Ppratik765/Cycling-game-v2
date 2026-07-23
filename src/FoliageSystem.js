@@ -583,9 +583,10 @@ export class FoliageSystem {
           new Float32Array(colors.subarray(0, count * 3)), 3
         );
       }
+      m.computeBoundingSphere(); // Calculates bounds across all instance positions
       m.castShadow = castShadow;
       m.receiveShadow = false;
-      m.frustumCulled = false;
+      m.frustumCulled = true; // Instantly drop from rendering if chunk is behind camera
       this.scene.add(m);
       entry[name] = m;
     };
