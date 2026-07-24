@@ -294,24 +294,31 @@ varying float vHeightRatio;
       '#include <color_fragment>',
       `#include <color_fragment>
   // Pampas height gradient:
-  // Root:  muted dark olive  #3e4734
-  // Stalk: pale straw/gold   #a69f70
-  // Plume: silky golden cream #e8e2c8
-  vec3 rootColor  = vec3(0.243, 0.278, 0.204);
-  vec3 stalkColor = vec3(0.651, 0.624, 0.439);
+  // Root (0.0 - 0.2): Dark green -> Natural green
+  // Body (0.2 - 0.75): Natural lush green (majority of grass)
+  // Plume (0.75 - 1.0): Silky golden cream top tip
+  vec3 rootColor  = vec3(0.125, 0.200, 0.094);
+  vec3 bodyColor  = vec3(0.239, 0.388, 0.169);
   vec3 plumeColor = vec3(0.910, 0.886, 0.784);
 
   vec3 grassGrad;
-  if (vHeightRatio < 0.4) {
-    grassGrad = mix(rootColor, stalkColor, vHeightRatio / 0.4);
-  } else if (vHeightRatio < 0.7) {
-    grassGrad = mix(stalkColor, plumeColor, (vHeightRatio - 0.4) / 0.3);
+  if (vHeightRatio < 0.2) {
+    grassGrad = mix(rootColor, bodyColor, vHeightRatio / 0.2);
+  } else if (vHeightRatio < 0.75) {
+    grassGrad = bodyColor;
   } else {
-    grassGrad = plumeColor;
+    grassGrad = mix(bodyColor, plumeColor, (vHeightRatio - 0.75) / 0.25);
   }
 
-  // Blend with per-instance color for variation
-  diffuseColor.rgb *= grassGrad;
+  vec3 instColor = diffuseColor.rgb;
+  vec3 blendedBody = grassGrad * instColor;
+
+  if (vHeightRatio > 0.75) {
+    float plumeFactor = (vHeightRatio - 0.75) / 0.25;
+    diffuseColor.rgb = mix(blendedBody, plumeColor, plumeFactor * 0.9);
+  } else {
+    diffuseColor.rgb = blendedBody;
+  }
 `
     );
   };
@@ -487,10 +494,10 @@ export class FoliageSystem {
       );
       this._mat4.toArray(grassBuffer, grassCount * 16);
 
-      // Per-instance tint: warm straw/olive variation (complements shader gradient)
-      const hue = 0.12 + rng() * 0.12;          // 43°–86° (gold → olive)
-      const sat = 0.15 + rng() * 0.20;           // Muted: 15%–35%
-      const lightness = 0.35 + rng() * 0.20;     // Mid-tone: 35%–55%
+      // Per-instance tint: natural green variation (olive → deep green)
+      const hue = 0.25 + rng() * 0.08;          // 90°–119° (olive → green)
+      const sat = 0.30 + rng() * 0.25;           // 30%–55%
+      const lightness = 0.45 + rng() * 0.20;     // 45%–65%
       _grassColor.setHSL(hue, sat, lightness);
       grassColors[grassCount * 3] = _grassColor.r;
       grassColors[grassCount * 3 + 1] = _grassColor.g;
@@ -600,10 +607,10 @@ export class FoliageSystem {
       );
       this._mat4.toArray(grassBuffer, grassCount * 16);
 
-      // Per-instance tint: warm straw/olive variation
-      const hue = 0.12 + rng() * 0.12;
-      const sat = 0.15 + rng() * 0.20;
-      const lightness = 0.35 + rng() * 0.20;
+      // Per-instance tint: natural green variation
+      const hue = 0.25 + rng() * 0.08;
+      const sat = 0.30 + rng() * 0.25;
+      const lightness = 0.45 + rng() * 0.20;
       _grassColor.setHSL(hue, sat, lightness);
       grassColors[grassCount * 3] = _grassColor.r;
       grassColors[grassCount * 3 + 1] = _grassColor.g;
