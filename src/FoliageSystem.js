@@ -8,12 +8,12 @@ import * as THREE from 'three';
 
 // ── Constants ────────────────────────────────────────────────
 
-const GRASS_PER_CHUNK = 23000;
+const GRASS_PER_CHUNK = 22000;
 const PINE_PER_CHUNK = 40;
 const BROADLEAF_PER_CHUNK = 20;
 
-const TRAIL_CLEAR = 6.0;
-const TRAIL_DENSE = 15.0;
+const TRAIL_CLEAR = 4.5;
+const TRAIL_DENSE = 8.0;
 
 // ── Trail equation (must match CustomSplatShader.js) ─────────
 function trailCurveX(z) {
@@ -39,33 +39,45 @@ function chunkSeed(cx, cz) {
 
 // ── Geometry builders ────────────────────────────────────────
 
-/** Grass tuft: Efficient V-shape (2 planes) with upward normals for perfect terrain blending */
-function createGrassTuft() {
-  const w = 0.18, h = 1.6;
+/** Pampas Grass Tuft: 3 intersecting tapered blades with slight top curve */
+function createPampasTuft() {
+  const bladeW = 0.18;
+  const bladeH = 2.25;
+  const segsH = 6; // Enough vertical segments for smooth bending
   const planes = [];
 
-  // Create 2 planes rotated at 90 degree intervals (0, 90) for a classic cross shape
-  for (let i = 0; i < 2; i++) {
-    const plane = new THREE.PlaneGeometry(w * 2, h, 1, 3);
+  for (let i = 0; i < 3; i++) {
+    const plane = new THREE.PlaneGeometry(bladeW * 2, bladeH, 1, segsH);
 
-    // Deliberately delete UVs so the grass acts as a solid colored plane (old aesthetic)
+    // Delete UVs — color is fully driven by vertex shader height gradient
     plane.deleteAttribute('uv');
 
-    plane.rotateY((Math.PI / 2) * i);
+    // Taper the blade: narrow at the top, wider at the base
+    const pos = plane.attributes.position.array;
+    for (let v = 0; v < pos.length; v += 3) {
+      const yNorm = (pos[v + 1] + bladeH / 2) / bladeH; // 0 at base, 1 at tip
+      const taper = 1.0 - yNorm * 0.7; // narrows to 30% width at tip
+      pos[v] *= taper;
+      // Slight forward curve at the top (plume droop)
+      if (yNorm > 0.6) {
+        const curveFactor = (yNorm - 0.6) / 0.4;
+        pos[v + 2] += curveFactor * curveFactor * 0.35;
+      }
+    }
 
-    // Add a slight lean to make the clump fan outward
-    const leanX = (i === 0 ? 0.15 : -0.15);
-    plane.rotateX(leanX);
-    plane.rotateZ(0.15);
+    plane.rotateY((Math.PI / 3) * i); // 60° apart for 3-way cross
 
-    plane.translate(0, h / 2, 0);
+    // Fan outward slightly for volume
+    const lean = (i === 0 ? 0.12 : i === 1 ? -0.08 : 0.05);
+    plane.rotateX(lean);
+
+    plane.translate(0, bladeH / 2, 0);
     planes.push(plane);
   }
 
   const merged = mergeGeometries(planes);
 
-  // Override normals to point straight up (0, 1, 0)
-  // This AAA trick makes grass shade exactly like the terrain underneath it
+  // Override normals to point straight up for terrain-matching shading
   const norms = merged.attributes.normal.array;
   for (let i = 0; i < norms.length; i += 3) {
     norms[i] = 0.0;
@@ -215,43 +227,96 @@ function mergeGeometries(geos) {
 
 // ── Wind material factory ────────────────────────────────────
 
-function createGrassMaterial(uTimeRef) {
+function createPampasMaterial(uTimeRef, uPlayerPosRef) {
   const mat = new THREE.MeshStandardMaterial({
-    color: 0x4a6340, // Desaturated olive — less vivid under ACES tonemapping
-    alphaTest: 0.5,
-    roughness: 0.9,
+    color: 0xffffff, // White base — color fully driven by shader gradient
+    roughness: 0.85,
     metalness: 0.0,
     side: THREE.DoubleSide,
   });
 
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uTimeRef;
+    shader.uniforms.uPlayerPos = uPlayerPosRef;
 
+    // ── Vertex shader: wind gusts + player interaction ──
     shader.vertexShader = shader.vertexShader.replace(
       '#include <common>',
       `#include <common>
 uniform float uTime;
+uniform vec3 uPlayerPos;
+varying float vHeightRatio;
 `
     );
 
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
       `#include <begin_vertex>
+
+  // Instance world origin
   vec4 worldInst = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-  float heightFactor = clamp(position.y / 1.8, 0.0, 1.0);
-  float heightSq = heightFactor * heightFactor;
-  float windPhase = uTime * 2.5 + worldInst.x * 0.25 + worldInst.z * 0.18;
-  float windX = sin(windPhase) * 0.7 + sin(windPhase * 2.3 + 1.5) * 0.3;
-  float windZ = cos(windPhase * 0.7 + 0.8) * 0.5;
-  transformed.x += windX * heightSq;
-  transformed.z += windZ * heightSq;
+
+  // Height ratio: 0 at root, 1 at tip (blade height ~2.25)
+  vHeightRatio = clamp(position.y / 2.25, 0.0, 1.0);
+  float heightWeight = pow(vHeightRatio, 1.6);
+
+  // World position of this vertex (approximate)
+  vec3 worldPos = worldInst.xyz + position;
+
+  // ── Wind gust wave (dual sine) ──
+  float wind = sin(worldPos.x * 0.08 + worldPos.z * 0.05 + uTime * 2.5) * 0.3
+             + sin(worldPos.z * 0.15 - uTime * 3.5) * 0.15;
+  transformed.x += wind * heightWeight;
+  transformed.z += wind * 0.6 * heightWeight;
+
+  // ── Player interaction: grass parts around cyclist ──
+  vec2 toPlayer = worldPos.xz - uPlayerPos.xz;
+  float distToPlayer = length(toPlayer);
+  if (distToPlayer < 2.5 && distToPlayer > 0.01) {
+    vec2 pushDir = normalize(toPlayer);
+    float pushAmount = (1.0 - (distToPlayer / 2.5)) * heightWeight * 1.5;
+    transformed.x += pushDir.x * pushAmount;
+    transformed.z += pushDir.y * pushAmount;
+    transformed.y -= pushAmount * 0.4; // Press down slightly
+  }
 `
     );
 
+    // ── Fragment shader: height-based color gradient ──
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <common>',
+      `#include <common>
+varying float vHeightRatio;
+`
+    );
 
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <color_fragment>',
+      `#include <color_fragment>
+  // Pampas height gradient:
+  // Root:  muted dark olive  #3e4734
+  // Stalk: pale straw/gold   #a69f70
+  // Plume: silky golden cream #e8e2c8
+  vec3 rootColor  = vec3(0.243, 0.278, 0.204);
+  vec3 stalkColor = vec3(0.651, 0.624, 0.439);
+  vec3 plumeColor = vec3(0.910, 0.886, 0.784);
+
+  vec3 grassGrad;
+  if (vHeightRatio < 0.4) {
+    grassGrad = mix(rootColor, stalkColor, vHeightRatio / 0.4);
+  } else if (vHeightRatio < 0.7) {
+    grassGrad = mix(stalkColor, plumeColor, (vHeightRatio - 0.4) / 0.3);
+  } else {
+    grassGrad = plumeColor;
+  }
+
+  // Blend with per-instance color for variation
+  diffuseColor.rgb *= grassGrad;
+`
+    );
   };
 
-  mat.customProgramCacheKey = () => 'foliage_grass_textured';
+  mat.customProgramCacheKey = () => 'pampas_grass_v1';
   return mat;
 }
 
@@ -341,16 +406,17 @@ export class FoliageSystem {
     this.scene = scene;
     this.noiseGen = noiseGen;
     this.uTime = { value: 0.0 };
+    this.uPlayerPos = { value: new THREE.Vector3(0, 0, 0) };
 
     // Shared geometries
-    this._grassGeo = createGrassTuft();
+    this._grassGeo = createPampasTuft();
     this._pineCanopyGeo = createPineCanopy();
     this._pineTrunkGeo = createPineTrunk();
     this._broadCanopyGeo = createBroadleafCanopy();
     this._broadTrunkGeo = createBroadleafTrunk();
 
     // Shared materials
-    this._grassMat = createGrassMaterial(this.uTime);
+    this._grassMat = createPampasMaterial(this.uTime, this.uPlayerPos);
     this._pineLeafMat = createLeafMaterial(0x3a6630, 'pine', this.uTime);    // Desaturated pine green
     this._broadLeafMat = createLeafMaterial(0x4a7a3a, 'broadleaf', this.uTime); // Desaturated broadleaf
     this._trunkMat = createTrunkMaterial();
@@ -365,8 +431,11 @@ export class FoliageSystem {
     this._up = new THREE.Vector3(0, 1, 0);
   }
 
-  update(elapsedTime) {
+  update(elapsedTime, playerPos) {
     this.uTime.value = elapsedTime;
+    if (playerPos) {
+      this.uPlayerPos.value.set(playerPos.x, playerPos.y, playerPos.z);
+    }
   }
 
   async populateChunkAsync(cx, cz, chunkSize) {
@@ -389,7 +458,7 @@ export class FoliageSystem {
 
     const _grassColor = new THREE.Color();
 
-    // ── Grass pass ────────────────────────────────────────────
+    // ── Pampas grass pass ──────────────────────────────────────
     for (let i = 0; i < GRASS_PER_CHUNK; i++) {
       const localX = (rng() - 0.5) * chunkSize;
       const localZ = (rng() - 0.5) * chunkSize;
@@ -400,17 +469,28 @@ export class FoliageSystem {
 
       const height = this.noiseGen.getHeight(worldX, worldZ);
       const yRot = rng() * Math.PI * 2;
-      const s = 0.8 + rng() * 0.6;
+
+      // Trail framing: taller, denser near path; shorter in open fields
+      let baseScale;
+      if (dist < TRAIL_DENSE) {
+        // Dense tall pampas framing the trail
+        baseScale = 1.0 + rng() * 0.5;
+      } else {
+        // Open field pampas — slightly shorter and varied
+        baseScale = 0.7 + rng() * 0.6;
+      }
+      const yScale = baseScale + rng() * 0.4; // Extra height variation
       this._mat4.compose(
         this._pos.set(worldX, height, worldZ),
         this._quat.setFromAxisAngle(this._up, yRot),
-        this._scale.set(s, s + rng() * 0.5, s)
+        this._scale.set(baseScale, yScale, baseScale)
       );
       this._mat4.toArray(grassBuffer, grassCount * 16);
 
-      const hue = 0.25 + rng() * 0.08;
-      const sat = 0.25 + rng() * 0.25;
-      const lightness = 0.18 + rng() * 0.14;
+      // Per-instance tint: warm straw/olive variation (complements shader gradient)
+      const hue = 0.12 + rng() * 0.12;          // 43°–86° (gold → olive)
+      const sat = 0.15 + rng() * 0.20;           // Muted: 15%–35%
+      const lightness = 0.35 + rng() * 0.20;     // Mid-tone: 35%–55%
       _grassColor.setHSL(hue, sat, lightness);
       grassColors[grassCount * 3] = _grassColor.r;
       grassColors[grassCount * 3 + 1] = _grassColor.g;
@@ -491,10 +571,10 @@ export class FoliageSystem {
     let pineCount = 0;
     let broadCount = 0;
 
-    // Color palette for grass variation (olive → deeper green, desaturated)
+    // Color palette for pampas variation (warm straw/olive)
     const _grassColor = new THREE.Color();
 
-    // ── Grass pass ────────────────────────────────────────────
+    // ── Pampas grass pass ──────────────────────────────────────
     for (let i = 0; i < GRASS_PER_CHUNK; i++) {
       const localX = (rng() - 0.5) * chunkSize;
       const localZ = (rng() - 0.5) * chunkSize;
@@ -504,18 +584,26 @@ export class FoliageSystem {
       if (dist < TRAIL_CLEAR) continue;
       const height = this.noiseGen.getHeight(worldX, worldZ);
       const yRot = rng() * Math.PI * 2;
-      const s = 0.8 + rng() * 0.6;
+
+      // Trail framing: taller, denser near path; shorter in open fields
+      let baseScale;
+      if (dist < TRAIL_DENSE) {
+        baseScale = 1.0 + rng() * 0.5;
+      } else {
+        baseScale = 0.7 + rng() * 0.6;
+      }
+      const yScale = baseScale + rng() * 0.4;
       this._mat4.compose(
         this._pos.set(worldX, height, worldZ),
         this._quat.setFromAxisAngle(this._up, yRot),
-        this._scale.set(s, s + rng() * 0.5, s)
+        this._scale.set(baseScale, yScale, baseScale)
       );
       this._mat4.toArray(grassBuffer, grassCount * 16);
 
-      // Per-instance color: random tint between olive and deeper green
-      const hue = 0.25 + rng() * 0.08;          // 90°–119° (olive → green)
-      const sat = 0.25 + rng() * 0.25;           // Desaturated: 25%–50%
-      const lightness = 0.18 + rng() * 0.14;     // Dark: 18%–32%
+      // Per-instance tint: warm straw/olive variation
+      const hue = 0.12 + rng() * 0.12;
+      const sat = 0.15 + rng() * 0.20;
+      const lightness = 0.35 + rng() * 0.20;
       _grassColor.setHSL(hue, sat, lightness);
       grassColors[grassCount * 3] = _grassColor.r;
       grassColors[grassCount * 3 + 1] = _grassColor.g;

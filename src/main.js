@@ -282,9 +282,9 @@ async function init() {
       // 3. Update terrain chunks around player
       chunkManager.update(playerPos.x, playerPos.z);
 
-      // 3.5 Update foliage wind animation
+      // 3.5 Update foliage wind animation + player interaction
       elapsed += delta;
-      foliage.update(elapsed);
+      foliage.update(elapsed, playerPos);
 
       // 4. Update backdrop parallax
       backdrop.update(camera);
