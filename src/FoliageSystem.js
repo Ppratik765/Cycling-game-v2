@@ -41,7 +41,7 @@ function chunkSeed(cx, cz) {
 
 /** Grass tuft: Efficient V-shape (2 planes) with upward normals for perfect terrain blending */
 function createGrassTuft() {
-  const w = 0.12, h = 1.6;
+  const w = 0.18, h = 1.6;
   const planes = [];
 
   // Create 2 planes rotated at 90 degree intervals (0, 90) for a classic cross shape
