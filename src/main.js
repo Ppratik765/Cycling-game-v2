@@ -9,6 +9,7 @@ import './style.css';
 // ── Three.js ────────────────────────────────────────────────
 import * as THREE from 'three';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // ── Physics ─────────────────────────────────────────────────
 import RAPIER from '@dimforge/rapier3d-compat';
@@ -68,6 +69,7 @@ async function init() {
 
   // ── Register all loading steps with weights ─────────────
   const stepTextures  = progress.addStep('Loading terrain textures…', 3);
+  const stepModels    = progress.addStep('Loading bike & gloves…', 3);
   const stepSkybox    = progress.addStep('Loading skybox…', 2);
   const stepTerrain   = progress.addStep('Generating terrain…', 2);
   const stepFoliage   = progress.addStep('Planting foliage…', 1);
@@ -208,6 +210,28 @@ async function init() {
     // Foliage was already populated inside chunkManager.init() via foliage.populateChunk()
     progress.completeStep(stepFoliage);
 
+    // ── Step 4a: Load bike & glove GLTF models ───────────────
+    progress.startStep(stepModels);
+    const gltfLoader = new GLTFLoader();
+
+    function loadGLTF(path) {
+      return new Promise((resolve, reject) => {
+        gltfLoader.load(
+          path,
+          (gltf) => resolve(gltf),
+          undefined,
+          (err) => reject(new Error(`Failed to load GLTF: ${path}`))
+        );
+      });
+    }
+
+    const [bikeGLTF, glovesGLTF] = await Promise.all([
+      loadGLTF('/carbon_frame_bike.glb'),
+      loadGLTF('/biker_gloves.glb'),
+    ]);
+    console.log('✅ Bike & gloves loaded');
+    progress.completeStep(stepModels);
+
     // ── Player Controller ─────────────────────────────────────
     // Spawn ON the trail curve so terrain is guaranteed to be there
     const spawnZ = 0;
@@ -219,6 +243,8 @@ async function init() {
       scene,
       camera,
       spawnPos: new THREE.Vector3(spawnX, spawnY, spawnZ),
+      bikeModel: bikeGLTF.scene,
+      glovesModel: glovesGLTF.scene,
     });
 
     // Pre-step physics so the player settles onto terrain before rendering
