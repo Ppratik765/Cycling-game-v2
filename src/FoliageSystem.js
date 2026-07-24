@@ -293,32 +293,21 @@ varying float vHeightRatio;
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <color_fragment>',
       `#include <color_fragment>
-  // Pampas height gradient:
-  // Root (0.0 - 0.2): Dark green -> Natural green
-  // Body (0.2 - 0.75): Natural lush green (majority of grass)
-  // Plume (0.75 - 1.0): Silky golden cream top tip
-  vec3 rootColor  = vec3(0.125, 0.200, 0.094);
-  vec3 bodyColor  = vec3(0.239, 0.388, 0.169);
-  vec3 plumeColor = vec3(0.910, 0.886, 0.784);
+  // Pampas height gradient: ultra-smooth smoothstep transitions
+  vec3 rootColor  = vec3(0.125, 0.200, 0.094); // Dark olive root
+  vec3 bodyColor  = vec3(0.239, 0.388, 0.169); // Rich natural green
+  vec3 plumeColor = vec3(0.910, 0.886, 0.784); // Silky golden cream plume
 
-  vec3 grassGrad;
-  if (vHeightRatio < 0.2) {
-    grassGrad = mix(rootColor, bodyColor, vHeightRatio / 0.2);
-  } else if (vHeightRatio < 0.75) {
-    grassGrad = bodyColor;
-  } else {
-    grassGrad = mix(bodyColor, plumeColor, (vHeightRatio - 0.75) / 0.25);
-  }
+  // Smooth root-to-body transition in the lower 35%
+  float bodyFactor = smoothstep(0.0, 0.35, vHeightRatio);
+  vec3 baseGrad = mix(rootColor, bodyColor, bodyFactor);
 
-  vec3 instColor = diffuseColor.rgb;
-  vec3 blendedBody = grassGrad * instColor;
+  // Apply per-instance green tint to body
+  vec3 instanceTinted = baseGrad * diffuseColor.rgb;
 
-  if (vHeightRatio > 0.75) {
-    float plumeFactor = (vHeightRatio - 0.75) / 0.25;
-    diffuseColor.rgb = mix(blendedBody, plumeColor, plumeFactor * 0.9);
-  } else {
-    diffuseColor.rgb = blendedBody;
-  }
+  // Ultra-smooth body-to-plume transition from 40% height to 100% tip
+  float plumeFactor = smoothstep(0.40, 1.0, vHeightRatio);
+  diffuseColor.rgb = mix(instanceTinted, plumeColor, plumeFactor);
 `
     );
   };
