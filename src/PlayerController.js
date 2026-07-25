@@ -272,10 +272,10 @@ export class PlayerController {
     const barCenter = this.bikeContainer.worldToLocal(barCenterWorld.clone());
 
     // Offset bike model INSIDE container for an authentic head-mounted GoPro riding view
-    // Raised camera slightly (+16cm) and pulled back (+26cm) so trail and mountains are completely unobstructed ahead!
-    bikeModel.position.set(-barCenter.x, -barCenter.y - 0.64, -barCenter.z - 0.68);
+    // Positioned at Y=-0.72m and Z=-0.52m so handlebars, suspension forks, AND spinning front wheel are cleanly visible!
+    bikeModel.position.set(-barCenter.x, -barCenter.y - 0.72, -barCenter.z - 0.52);
     bikeModel.updateMatrixWorld(true);
-    console.log(`🎯 Handlebars framed in raised head GoPro view: position=(${bikeModel.position.x.toFixed(3)}, ${bikeModel.position.y.toFixed(3)}, ${bikeModel.position.z.toFixed(3)})`);
+    console.log(`🎯 Handlebars & front wheel framed in GoPro view: position=(${bikeModel.position.x.toFixed(3)}, ${bikeModel.position.y.toFixed(3)}, ${bikeModel.position.z.toFixed(3)})`);
 
     // ── Wheel Setup (German Naming) ──────────────────────────
     // Front wheel is inside steeringPivot; rear wheel is inside bikeModel
@@ -341,9 +341,10 @@ export class PlayerController {
     this.leftHand.position.set(0.0310, 0.3262, 0.0362);
     this.rightHand.position.set(0.0310, -0.3267, 0.0363);
 
-    // Apply precision Euler angles so open palms clamp downward over rubber grips and fingers curl forward in a fist riding pose!
-    this.rightHand.rotation.set(-0.04, 0.76, -1.54);
-    this.leftHand.rotation.set(-0.04, 0.76, -1.54);
+    // Apply palm-down fist rotation (+1.60 rad Z flip) so open palms clamp DOWNWARD over the top
+    // of the rubber handlebar grips with knuckles facing up and fingers wrapped underneath!
+    this.rightHand.rotation.set(-0.04, 0.76, 1.60);
+    this.leftHand.rotation.set(-0.04, 0.76, 1.60);
 
     if (this.steeringPivot) {
       this.steeringPivot.add(this.rightHand);
@@ -566,14 +567,18 @@ export class PlayerController {
     const shakeX = (Math.random() - 0.5) * this.cameraShake;
     const shakeY = (Math.random() - 0.5) * this.cameraShake;
 
-    // Base helmet GoPro pitch (tilted slightly down towards handlebars and trail)
-    const basePitch = -0.15; // ~8.6° downward tilt
+    // Smoothly interpolate head orientation for fluid, natural human movement
+    this._smoothYaw = (this._smoothYaw || 0) + (((this.headYaw || 0) - (this._smoothYaw || 0)) * Math.min(delta * 16.0, 1.0));
+    this._smoothPitch = (this._smoothPitch || 0) + (((this.headPitch || 0) - (this._smoothPitch || 0)) * Math.min(delta * 16.0, 1.0));
+
+    // Base helmet GoPro pitch (tilted -15° downward toward handlebars and front wheel)
+    const basePitch = -0.26; // ~15° downward tilt to cleanly frame spinning front wheel!
 
     // Camera is parented to leanPivot; set local position + rotation
     this.camera.position.set(0, CAM_HEIGHT, 0);
     this.camera.rotation.set(
-      basePitch + vibX + shakeX,
-      0,
+      basePitch + this._smoothPitch + vibX + shakeX,
+      this._smoothYaw + vibZ * 0.2,
       vibY + shakeY,
       'YXZ'
     );
@@ -582,6 +587,11 @@ export class PlayerController {
   // ── Input Binding ──────────────────────────────────────────
 
   _bindInput() {
+    this.headYaw = 0.0;
+    this.headPitch = 0.0;
+    this._smoothYaw = 0.0;
+    this._smoothPitch = 0.0;
+
     const handler = (e, pressed) => {
       let key = e.key.toLowerCase();
 
@@ -598,5 +608,33 @@ export class PlayerController {
 
     window.addEventListener('keydown', (e) => handler(e, true));
     window.addEventListener('keyup', (e) => handler(e, false));
+
+    // ── Mouse / Cursor Free Look (with realistic human waist & neck limits) ──
+    const MOUSE_SENSITIVITY = 0.0025;
+    const MAX_YAW = 1.40;         // ~±80° max human left/right turn while seated gripping handlebars
+    const MAX_PITCH_UP = 0.55;    // ~+31° looking up at peaks and sky
+    const MAX_PITCH_DOWN = -0.85; // ~-48° looking straight down at spinning front wheel and axle
+
+    window.addEventListener('mousemove', (e) => {
+      // Supports both locked pointer and cursor hovering over window/canvas
+      const deltaX = e.movementX || 0;
+      const deltaY = e.movementY || 0;
+
+      if (Math.abs(deltaX) + Math.abs(deltaY) > 0) {
+        this.headYaw -= deltaX * MOUSE_SENSITIVITY;
+        this.headPitch -= deltaY * MOUSE_SENSITIVITY;
+
+        // Strictly enforce human anatomical boundaries (no unrealistic 360° spinning!)
+        this.headYaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, this.headYaw));
+        this.headPitch = Math.max(MAX_PITCH_DOWN, Math.min(MAX_PITCH_UP, this.headPitch));
+      }
+    });
+
+    // Click canvas to lock pointer for seamless free-view head turning
+    window.addEventListener('click', (e) => {
+      if (!document.pointerLockElement && e.target && e.target.tagName === 'CANVAS') {
+        e.target.requestPointerLock?.();
+      }
+    });
   }
 }

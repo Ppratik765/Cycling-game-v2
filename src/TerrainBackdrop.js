@@ -13,7 +13,7 @@ export class TerrainBackdrop {
     scene,
     radius = 800,
     height = 400,
-    segments = 160,
+    segments = 144,
     seed = 77
   }) {
     this.scene = scene;
@@ -22,13 +22,13 @@ export class TerrainBackdrop {
     const prng = this._mulberry32(seed);
     const noise = createNoise2D(prng);
 
-    // Open-ended cylinder with high radial resolution for detailed peaks & ridges
+    // Open-ended cylinder with refined radial resolution for an elegant, smooth silhouette
     const geo = new THREE.CylinderGeometry(
       radius,  // radiusTop
       radius,  // radiusBottom
       height,  // height
       segments, // radialSegments
-      20,      // heightSegments — smooth mesh for gullies and ravines
+      16,      // heightSegments
       true     // openEnded
     );
 
@@ -40,39 +40,31 @@ export class TerrainBackdrop {
       const z = posAttr.getZ(i);
 
       const angle = Math.atan2(z, x);
-      // Use seamless circular coordinates (u, v) so the 360° panorama matches perfectly without any vertical seams!
+      // Seamless circular coordinates (u, v) ensure zero vertical seams around the 360° ring
       const u = Math.cos(angle);
       const v = Math.sin(angle);
       
-      // 1. Continental Range & Valley Pass Envelope (macro cyclic variation around horizon)
-      // Generates towering alpine chains in certain sectors and sweeping valley dips in others
-      const rangeEnvelope = Math.sin(angle * 1.5 + 0.7) * 0.4 + Math.cos(angle * 2.5 - 1.2) * 0.35 + noise(u * 0.8, v * 0.8) * 0.35;
-      const macroScale = Math.max(0.15, Math.min(1.5, 0.75 + rangeEnvelope));
-
-      // 2. Multi-Octave Organic Alpine Peaks
+      // Elegant Middle-Ground Peaks: Slightly smaller than original (85m max vs 115m), maintaining a clean, dignified silhouette
       const peakNoise =
-        noise(u * 2.5, v * 2.5) * 65.0 +
-        noise(u * 5.0, v * 5.0) * 30.0 +
-        noise(u * 11.0, v * 11.0) * 15.0 +
-        noise(u * 22.0, v * 22.0) * 7.0;
-        
-      // 3. Massive Depth & Radial Variance (completely eliminates circular wall effect!)
-      // Some mountain ridges advance closer to the player (~540m), while deep valleys recede far into horizon haze (~1060m)
+        noise(u * 2.0, v * 2.0) * 55.0 +
+        noise(u * 6.0, v * 6.0) * 22.0 +
+        noise(u * 14.0, v * 14.0) * 8.0;
+
+      // Subtle, tasteful depth & ravines (~80m variance) so it doesn't look like a flat circular wall
       const depthVariation = 
-        noise(u * 1.6 + 10.0, v * 1.6 + 10.0) * 190.0 + 
-        noise(u * 4.2 + 5.0,  v * 4.2 + 5.0)  * 70.0 + 
-        noise(u * 12.0,       y * 0.01)       * 25.0;   // Vertical cliff ravines & rock face gullies
+        noise(u * 3.0, v * 3.0) * 50.0 + 
+        noise(u * 8.0, y * 0.005) * 22.0 + 
+        noise(u * 16.0, y * 0.01)  * 10.0;
 
       // Only displace upper body strongly, keeping base cylinder buried smoothly below terrain
       const heightNorm = (y + height / 2) / height; 
       
-      // Apply continental envelope to peak heights; allow sweeping negative dips for open mountain passes!
-      const finalElevation = (peakNoise * macroScale) - (1.0 - macroScale) * 50.0;
+      // Allow gentle, natural valley dips down to -30m instead of clamping flat to zero (which created horizontal wall edges!)
+      const finalElevation = Math.max(-30.0, peakNoise);
       posAttr.setY(i, y + finalElevation * heightNorm);
       
       const currentRadius = Math.sqrt(x * x + z * z);
-      // Advance or recede mountain faces drastically based on depth variation
-      const newRadius = currentRadius + depthVariation * Math.pow(heightNorm, 0.65);
+      const newRadius = currentRadius + depthVariation * heightNorm;
       
       posAttr.setX(i, Math.cos(angle) * newRadius);
       posAttr.setZ(i, Math.sin(angle) * newRadius);
