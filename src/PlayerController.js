@@ -15,7 +15,7 @@ const BRAKE_DECEL = 20.0;   // m/s² braking force (S while moving fwd)
 const REVERSE_MAX_SPEED = 6.0;    // m/s reverse
 const REVERSE_ACCEL = 4.0;    // m/s² reverse acceleration
 
-const LEAN_MAX_DEG = 22.0;   // max lean roll in degrees
+const LEAN_MAX_DEG = 26.0;   // max lean roll in degrees (increased for slightly more pronounced tilt)
 const LEAN_SPEED = 2.0;    // lerp speed for lean
 const TURN_RATE = 1.0;    // yaw rate multiplier
 
