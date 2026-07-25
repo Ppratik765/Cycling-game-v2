@@ -22,10 +22,10 @@ const TURN_RATE         = 1.0;    // yaw rate multiplier
 const STEER_MAX_RAD     = 0.35;   // ±20° max handlebar steering
 const STEER_SPEED       = 5.0;    // lerp speed for handlebar rotation
 
-const CAM_HEIGHT        = 1.3;    // Y offset (GoPro chest mount height)
+const CAM_HEIGHT        = 1.65;   // Y offset (GoPro head/helmet mount height for seated rider)
 const CAM_SMOOTH_POS    = 6.0;    // position spring stiffness
 const CAM_SMOOTH_ROT    = 8.0;    // rotation spring stiffness
-const CAM_FOV           = 85;     // GoPro-style wide FOV
+const CAM_FOV           = 88;     // GoPro-style wide FOV
 const CAM_NEAR          = 0.05;   // Near plane — prevent clipping gloves/bars
 
 const CAPSULE_HALF_H    = 0.4;
@@ -252,10 +252,11 @@ export class PlayerController {
     const barCenterWorld = barBox.getCenter(new THREE.Vector3());
     const barCenter = this.bikeContainer.worldToLocal(barCenterWorld.clone());
 
-    // 4. Offset bike model INSIDE container so handlebars sit perfectly in GoPro view
-    bikeModel.position.set(-barCenter.x, -barCenter.y - 0.35, -barCenter.z - 0.25);
+    // 4. Offset bike model INSIDE container for a seated head-mounted GoPro perspective
+    // Handlebars sit ~52cm below head camera and ~45cm ahead in wide POV
+    bikeModel.position.set(-barCenter.x, -barCenter.y - 0.52, -barCenter.z - 0.45);
     bikeModel.updateMatrixWorld(true);
-    console.log(`🎯 Handlebars framed in GoPro view: position=(${bikeModel.position.x.toFixed(3)}, ${bikeModel.position.y.toFixed(3)}, ${bikeModel.position.z.toFixed(3)})`);
+    console.log(`🎯 Handlebars framed in head GoPro view: position=(${bikeModel.position.x.toFixed(3)}, ${bikeModel.position.y.toFixed(3)}, ${bikeModel.position.z.toFixed(3)})`);
 
     // ── The Steering Pivot Fix (Using Object3D.attach) ───────
     // 1. Create a new group for steering pivot
@@ -583,10 +584,13 @@ export class PlayerController {
     const shakeX = (Math.random() - 0.5) * this.cameraShake;
     const shakeY = (Math.random() - 0.5) * this.cameraShake;
 
+    // Base helmet GoPro pitch (tilted slightly down towards handlebars and trail)
+    const basePitch = -0.15; // ~8.6° downward tilt
+
     // Camera is parented to leanPivot; set local position + rotation
     this.camera.position.set(0, CAM_HEIGHT, 0);
     this.camera.rotation.set(
-      vibX + shakeX,
+      basePitch + vibX + shakeX,
       0,
       vibY + shakeY,
       'YXZ'
