@@ -19,7 +19,7 @@ const LEAN_MAX_DEG      = 22.0;   // max lean roll in degrees
 const LEAN_SPEED        = 2.0;    // lerp speed for lean
 const TURN_RATE         = 1.0;    // yaw rate multiplier
 
-const STEER_MAX_RAD     = 0.35;   // ±20° max handlebar steering
+const STEER_MAX_RAD     = 0.314;  // ±18° max handlebar steering
 const STEER_SPEED       = 5.0;    // lerp speed for handlebar rotation
 
 const CAM_HEIGHT        = 1.65;   // Y offset (GoPro head/helmet mount height for seated rider)
@@ -62,20 +62,20 @@ const STEERING_KEYWORDS = ['lenker', 'gabel', 'griffe', 'griffseiten', 'bremsheb
 const REAR_WHEEL_KEYWORDS = ['radhinten', 'zb_hr'];
 const SADDLE_KEYWORDS = ['sattel'];
 
-// ── Helper: find node by keyword in hierarchy ────────────────
+// ── Helper: find node by keyword in hierarchy (priority order) ──
 function findNodeByKeyword(root, keywords) {
-  let found = null;
-  root.traverse((child) => {
-    if (found) return;
-    const name = (child.name || '').toLowerCase();
-    for (const kw of keywords) {
+  for (const kw of keywords) {
+    let found = null;
+    root.traverse((child) => {
+      if (found) return;
+      const name = (child.name || '').toLowerCase();
       if (name.includes(kw)) {
         found = child;
-        return;
       }
-    }
-  });
-  return found;
+    });
+    if (found) return found;
+  }
+  return null;
 }
 
 // ── Helper: collect ALL nodes matching keywords ──────────────
@@ -105,41 +105,6 @@ function findLocalAxle(wheel, defaultAxis = new THREE.Vector3(1, 0, 0)) {
     return new THREE.Vector3(0, Math.sign(localDir.y), 0);
   } else {
     return new THREE.Vector3(0, 0, Math.sign(localDir.z));
-  }
-}
-
-// ── Helper: Curl hand joints/bones into a closed racing fist around grips ─
-function curlGloveFist(handModel, isLeft) {
-  if (!handModel) return;
-  let jointsCurled = 0;
-  handModel.traverse((child) => {
-    const name = (child.name || '').toLowerCase();
-    const isFinger = name.includes('finger') || name.includes('thumb') || 
-                     name.includes('index') || name.includes('middle') || 
-                     name.includes('ring') || name.includes('pinky') || 
-                     name.includes('little') || name.includes('joint') || 
-                     name.includes('fist') || name.includes('phalanx') || child.isBone;
-    if (isFinger && child !== handModel) {
-      if (name.includes('thumb')) {
-        child.rotation.x += isLeft ? 0.7 : 0.7;
-        child.rotation.y += isLeft ? -0.5 : 0.5;
-        child.rotation.z += isLeft ? 0.4 : -0.4;
-      } else {
-        child.rotation.x += -1.05; // Curl main fingers securely around grip
-        if (child.rotation.z !== undefined) child.rotation.z *= 0.5;
-      }
-      jointsCurled++;
-    }
-    if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
-      for (const [key, idx] of Object.entries(child.morphTargetDictionary)) {
-        if (key.toLowerCase().match(/(fist|close|grip|clench|grasp)/)) {
-          child.morphTargetInfluences[idx] = 1.0;
-        }
-      }
-    }
-  });
-  if (jointsCurled > 0) {
-    console.log(`✊ Clenched ${jointsCurled} joints into fist (${isLeft ? 'Left' : 'Right'} hand)`);
   }
 }
 
@@ -256,32 +221,10 @@ export class PlayerController {
   }
 
   _setupBikeModel(bikeModel) {
-    // ── Step 1: Scale & Auto-Align Bike Orientation Straight Ahead (-Z) ──
+    // ── Step 1: Scale & Orient Bike Model ────────────────────
+    // GLTF forward axis is +X → rotate -90° around Y so front faces -Z.
     bikeModel.name = 'BikeModel';
-    bikeModel.rotation.set(0, 0, 0);
-    bikeModel.updateMatrixWorld(true);
-
-    // Dynamically calculate forward vector from rear axle to front assembly
-    const fWheelTemp = findNodeByKeyword(bikeModel, ['zb_vr', 'radvorne', 'gabel', 'lenker']);
-    const rWheelTemp = findNodeByKeyword(bikeModel, REAR_WHEEL_KEYWORDS);
-
-    if (fWheelTemp && rWheelTemp) {
-      const fPos = new THREE.Vector3();
-      const rPos = new THREE.Vector3();
-      fWheelTemp.getWorldPosition(fPos);
-      rWheelTemp.getWorldPosition(rPos);
-      const forwardDir = new THREE.Vector3().subVectors(fPos, rPos);
-      forwardDir.y = 0;
-      if (forwardDir.lengthSq() > 0.0001) {
-        forwardDir.normalize();
-        // Target straight forward direction is -Z (atan2(0, -1) = Math.PI)
-        bikeModel.rotation.y = Math.PI - Math.atan2(forwardDir.x, forwardDir.z);
-        console.log(`🧭 Bike automatically aligned straight ahead along -Z (Y-rotation: ${(bikeModel.rotation.y * 180 / Math.PI).toFixed(1)}°)`);
-      }
-    } else {
-      // Default positive rotation fallback if wheel nodes missing
-      bikeModel.rotation.y = Math.PI / 2;
-    }
+    bikeModel.rotation.y = -Math.PI / 2;
 
     const rawBox = new THREE.Box3().setFromObject(bikeModel);
     const bikeHeight = rawBox.max.y - rawBox.min.y;
@@ -300,45 +243,54 @@ export class PlayerController {
       }
     });
 
-    // ── Dynamic Camera Framing ───────────────────────────────
-    // 2. Traverse the bike and find handlebar/fork mesh ("lenker", "griff", "gabel", "steer")
-    const handlebarMesh = findNodeByKeyword(bikeModel, ['lenker', 'griff', 'gabel', 'steer']) || bikeModel;
-
-    // 3. Calculate exact center of the handlebars
-    const barBox = new THREE.Box3().setFromObject(handlebarMesh);
+    // ── Dynamic Camera Framing & Grip Positioning ────────────
+    // 2. Locate actual grip / handlebar nodes ("griffe", "griffseiten", "lenker") for precise center
+    const gripNodes = collectNodesByKeywords(bikeModel, ['griffe', 'griffseiten', 'lenker', 'metallenker']);
+    const barBox = new THREE.Box3();
+    if (gripNodes.length > 0) {
+      gripNodes.forEach(n => barBox.expandByObject(n));
+    } else {
+      const fallback = findNodeByKeyword(bikeModel, ['lenker', 'griff', 'gabel', 'steer']) || bikeModel;
+      barBox.setFromObject(fallback);
+    }
     const barCenterWorld = barBox.getCenter(new THREE.Vector3());
     const barCenter = this.bikeContainer.worldToLocal(barCenterWorld.clone());
 
-    // 4. Offset bike model INSIDE container for a seated head-mounted GoPro perspective
+    // 3. Offset bike model INSIDE container for a seated head-mounted GoPro perspective
     // Handlebars sit ~52cm below head camera and ~45cm ahead in wide POV
     bikeModel.position.set(-barCenter.x, -barCenter.y - 0.52, -barCenter.z - 0.45);
     bikeModel.updateMatrixWorld(true);
     console.log(`🎯 Handlebars framed in head GoPro view: position=(${bikeModel.position.x.toFixed(3)}, ${bikeModel.position.y.toFixed(3)}, ${bikeModel.position.z.toFixed(3)})`);
 
-    // ── The Steering Pivot Fix (Using Object3D.attach) ───────
+    // ── The Steering Pivot Fix & Crooked Assembly Correction ─
     // 1. Create a new group for steering pivot
     this.steeringPivot = new THREE.Group();
     this.steeringPivot.name = 'SteeringPivot';
 
-    // Re-calculate updated handlebar center in world space after repositioning bikeModel
-    const updatedBarBox = new THREE.Box3().setFromObject(handlebarMesh);
+    // Re-calculate updated handlebar/grip center after repositioning bikeModel
+    const updatedBarBox = new THREE.Box3();
+    if (gripNodes.length > 0) {
+      gripNodes.forEach(n => updatedBarBox.expandByObject(n));
+    } else {
+      const fallback = findNodeByKeyword(bikeModel, ['lenker', 'griff', 'gabel', 'steer']) || bikeModel;
+      updatedBarBox.setFromObject(fallback);
+    }
     const updatedBarCenterWorld = updatedBarBox.getCenter(new THREE.Vector3());
 
-    // 2 & 3. Add to bikeModel and set its position to handlebar center in bikeModel local space
+    // 2. Add steeringPivot to bikeModel at exact handlebar grip center
     bikeModel.add(this.steeringPivot);
     bikeModel.updateMatrixWorld(true);
     this.steeringPivot.position.copy(bikeModel.worldToLocal(updatedBarCenterWorld.clone()));
 
-    // Align steeringPivot axes with bikeContainer/world (-Z forward, +X right, +Y up)
+    // 3. Align steeringPivot with world coordinates (-Z forward, +X right, +Y up)
     this.steeringPivot.quaternion.copy(bikeModel.quaternion).invert();
+
+    // 4. PRE-ALIGNMENT FOR CROOKED GLTF: The front fork & bars are exported ~26° turned to the left.
+    // Rotate steeringPivot by -26° (-0.45 rad) BEFORE attaching parts so local X remains aligned with grips!
+    const CROOKED_OFFSET = -0.45; // ~-26° built-in left turn in GLTF
+    this.steeringPivot.rotateY(CROOKED_OFFSET);
     this.steeringPivot.updateMatrixWorld(true);
-
-    // Save initial Y rotation for clean steering updates in render loop
-    this._baseSteerY = this.steeringPivot.rotation.y;
-
-    // 4. CRITICAL: Update world matrices BEFORE attaching
     bikeModel.updateMatrixWorld(true);
-    this.steeringPivot.updateMatrixWorld(true);
 
     // 5. Traverse bike model, collect all front assembly meshes (Fork, Handlebars, Front Wheel)
     const steeringParts = [];
@@ -346,7 +298,6 @@ export class PlayerController {
       if (child === this.steeringPivot) return;
       const name = (child.name || '').toLowerCase();
       if (STEERING_KEYWORDS.some(kw => name.includes(kw))) {
-        // Collect highest-level matching ancestor to retain original group structure
         let ancestorMatches = false;
         let curr = child.parent;
         while (curr && curr !== bikeModel) {
@@ -364,9 +315,15 @@ export class PlayerController {
     });
 
     console.log(`🔧 Attaching ${steeringParts.length} front steering assemblies using Object3D.attach()`);
-    // 6. Attach them to the pivot: preserves exact world transforms while reparenting!
+    // 6. Attach front assemblies while preserving world transforms
     steeringParts.forEach(part => this.steeringPivot.attach(part));
+
+    // 7. APPLY BASELINE STRAIGHTENING: rotate +26° (+0.45 rad) so front wheel and bars point DEAD STRAIGHT ahead along -Z at rest!
+    const CORRECTION_ANGLE = 0.45;
+    this._baseSteerY = this.steeringPivot.rotation.y + CORRECTION_ANGLE;
+    this.steeringPivot.rotation.y = this._baseSteerY;
     this.steeringPivot.updateMatrixWorld(true);
+    console.log(`🧭 Front steering assembly straightened: base steer Y set to ${this._baseSteerY.toFixed(3)} rad`);
 
     // ── Wheel Setup (German Naming) ──────────────────────────
     // Front wheel is inside steeringPivot; rear wheel is inside bikeModel
@@ -420,44 +377,21 @@ export class PlayerController {
       }
     });
 
-    // ── Step 4: Curl fingers into a closed fist to sell riding illusion ─
-    curlGloveFist(this.rightHand, false);
-    curlGloveFist(this.leftHand, true);
+    // ── Step 4: Add directly to steeringPivot at handlebar grips ─
+    // Because steeringPivot local space is centered on actual grip bounding box,
+    // positioning at ±0.33m snaps the gloves directly to the left and right grip endpoints!
+    this.rightHand.position.set(0.33, 0.02, -0.02);
+    this.leftHand.position.set(-0.33, 0.02, -0.02);
 
-    // Apply local rotations so palms face down/forward to wrap around handles
-    this.rightHand.rotation.set(Math.PI / 3, -0.2, -Math.PI / 2);
-    this.leftHand.rotation.set(Math.PI / 3, 0.2, Math.PI / 2);
+    // Apply local Euler rotations so open palms point DOWNWARD (-Y) toward ground
+    // and knuckles/fingers tilt forward/down, wrapping flush around handlebar grips
+    this.rightHand.rotation.set(1.25, -0.2, -Math.PI / 2);
+    this.leftHand.rotation.set(1.25, 0.2, Math.PI / 2);
 
-    // ── Step 5: Anchor directly onto exact 3D coordinates of handlebar grips ('Griffe') ─
     if (this.steeringPivot) {
-      this.steeringPivot.updateMatrixWorld(true);
-      const gripNodes = collectNodesByKeywords(this.steeringPivot, ['griff']);
-      const targetBox = new THREE.Box3();
-      if (gripNodes && gripNodes.length > 0) {
-        gripNodes.forEach(node => targetBox.expandByObject(node));
-      } else {
-        const fallbackNodes = collectNodesByKeywords(this.steeringPivot, ['lenker', 'bar', 'handle', 'steer']);
-        fallbackNodes.forEach(node => targetBox.expandByObject(node));
-      }
-
-      if (!targetBox.isEmpty()) {
-        const centerWorld = targetBox.getCenter(new THREE.Vector3());
-        const localCenter = this.steeringPivot.worldToLocal(centerWorld.clone());
-        const widthWorld = targetBox.max.x - targetBox.min.x;
-        const halfWidth = widthWorld > 0.15 ? (widthWorld * 0.5 * 0.82) : 0.32;
-
-        // Place right and left fists precisely onto rubber grips
-        this.rightHand.position.set(localCenter.x + halfWidth, localCenter.y + 0.01, localCenter.z - 0.02);
-        this.leftHand.position.set(localCenter.x - halfWidth, localCenter.y + 0.01, localCenter.z - 0.02);
-        console.log(`🎯 Fists positioned onto 'Griffe' at X=±${halfWidth.toFixed(3)}, Y=${localCenter.y.toFixed(3)}, Z=${localCenter.z.toFixed(3)}`);
-      } else {
-        this.rightHand.position.set(0.32, 0, 0);
-        this.leftHand.position.set(-0.32, 0, 0);
-      }
-
       this.steeringPivot.add(this.rightHand);
       this.steeringPivot.add(this.leftHand);
-      console.log('🧤 Both gloves anchored directly to steeringPivot at handlebar grips');
+      console.log('🧤 Both gloves snapped directly to steeringPivot grips (±0.33, 0.02, -0.02)');
     } else {
       this.leanPivot.add(this.rightHand);
       this.leanPivot.add(this.leftHand);
@@ -619,31 +553,35 @@ export class PlayerController {
     this.leanPivot.rotation.z = this.currentLean;
 
     // ── Steering Pivot (Handlebars + Front Assembly + Gloves) ──
+    // Apply steering input as relative delta ON TOP of baseline straight alignment (±18°)
     if (this.steeringPivot && this._baseSteerY !== undefined) {
       this.steeringPivot.rotation.y = this._baseSteerY + this.steerAngle;
     }
 
-    // ── Wheel Spin Physics ──────────────────────────────────
-    // Calculate actual forward ground speed from Rapier3D linear velocity
+    // ── Speed-Proportional Wheel Rolling ────────────────────
+    // 1. Get current 2D ground velocity from Rapier3D player RigidBody
     const vel = this.rigidBody.linvel();
-    const horizontalVel = new THREE.Vector3(vel.x, 0, vel.z);
-    let forwardSpeed = 0;
-    if (horizontalVel.lengthSq() > 0.0001) {
-      // Forward direction in world space is -Z rotated by player yaw
-      const forwardDir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, this.yaw, 0));
-      forwardSpeed = horizontalVel.dot(forwardDir);
-      // If practically stationary, wheels MUST NOT SPIN
-      if (Math.abs(forwardSpeed) < 0.05) forwardSpeed = 0;
-    }
+    const speed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
 
-    if (forwardSpeed !== 0) {
-      const spinAngle = (forwardSpeed * delta) / WHEEL_RADIUS;
-      // Rotate safely around detected local axle axes
-      if (this.frontWheel && this._frontAxle) {
-        this.frontWheel.rotateOnAxis(this._frontAxle, spinAngle);
+    // 2. If speed < 0.1 (stationary), wheel rotation velocity MUST be 0
+    if (speed >= 0.1) {
+      // Direction of rotation matches forward movement; if rolling backward, invert sign
+      const forwardDir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, this.yaw, 0));
+      const velDir = new THREE.Vector3(vel.x, 0, vel.z).normalize();
+      const isBackward = forwardDir.dot(velDir) < -0.2;
+
+      const wheelRadius = 0.33; // meters
+      let deltaRotation = (speed * delta) / wheelRadius;
+      if (isBackward) deltaRotation = -deltaRotation;
+
+      // 3. Rotate front and rear wheels around their local axle X-axis every frame
+      if (this.frontWheel) {
+        if (this._frontAxle) this.frontWheel.rotateOnAxis(this._frontAxle, deltaRotation);
+        else this.frontWheel.rotateX(deltaRotation);
       }
-      if (this.rearWheel && this._rearAxle) {
-        this.rearWheel.rotateOnAxis(this._rearAxle, spinAngle);
+      if (this.rearWheel) {
+        if (this._rearAxle) this.rearWheel.rotateOnAxis(this._rearAxle, deltaRotation);
+        else this.rearWheel.rotateX(deltaRotation);
       }
     }
   }
