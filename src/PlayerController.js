@@ -25,7 +25,8 @@ const HANDLEBAR_SPEED   = 4.0;    // lerp speed for handlebar rotation
 const CAM_HEIGHT        = 1.3;    // Y offset (GoPro chest mount height)
 const CAM_SMOOTH_POS    = 6.0;    // position spring stiffness
 const CAM_SMOOTH_ROT    = 8.0;    // rotation spring stiffness
-const CAM_FOV           = 95;     // GoPro-style wide FOV
+const CAM_FOV           = 85;     // GoPro-style wide FOV
+const CAM_NEAR          = 0.05;   // Near plane — prevent clipping gloves/bars
 
 const CAPSULE_HALF_H    = 0.4;
 const CAPSULE_RADIUS    = 0.35;
@@ -138,8 +139,9 @@ export class PlayerController {
     this._rayOrigin = new THREE.Vector3();
     this._rayDir    = { x: 0.0, y: -1.0, z: 0.0 };
 
-    // Set camera FOV
+    // Set camera FOV & near plane
     this.camera.fov = CAM_FOV;
+    this.camera.near = CAM_NEAR;
     this.camera.updateProjectionMatrix();
   }
 
@@ -178,23 +180,14 @@ export class PlayerController {
   }
 
   _setupBikeModel(bikeModel) {
-    // Auto-scale bike to reasonable first-person size
-    // Measure the bike's bounding box to determine scale
-    const box = new THREE.Box3().setFromObject(bikeModel);
-    const bikeHeight = box.max.y - box.min.y;
-    const desiredHeight = 1.1; // bike frame should be ~1.1m tall in scene
+    // ── Step 1: Scale bike to a reasonable first-person size ──
+    const rawBox = new THREE.Box3().setFromObject(bikeModel);
+    const bikeHeight = rawBox.max.y - rawBox.min.y;
+    const desiredHeight = 1.1;
     const scale = desiredHeight / Math.max(bikeHeight, 0.01);
-
     bikeModel.scale.setScalar(scale);
 
-    // Center horizontally
-    box.setFromObject(bikeModel);
-    const center = box.getCenter(new THREE.Vector3());
-    bikeModel.position.x -= center.x;
-    bikeModel.position.z -= center.z;
-    bikeModel.position.y -= box.min.y; // sit on ground level
-
-    // Log model hierarchy for debugging
+    // ── Step 2: Log hierarchy for debugging ──────────────────
     console.log('🚲 Bike model hierarchy:');
     bikeModel.traverse((child) => {
       if (child.isMesh || child.isGroup) {
@@ -202,17 +195,16 @@ export class PlayerController {
       }
     });
 
-    // Try to find handlebar/fork assembly
+    // ── Step 3: Find handlebar node ──────────────────────────
     this.handlebarAssembly = findMeshByKeyword(bikeModel,
       ['handlebar', 'handle_bar', 'steering', 'fork', 'steer']);
 
-    // Try to find wheels
+    // ── Step 4: Find wheels ──────────────────────────────────
     this.frontWheel = findMeshByKeyword(bikeModel,
       ['front_wheel', 'frontwheel', 'wheel_front', 'wheel_f']);
     this.rearWheel = findMeshByKeyword(bikeModel,
       ['rear_wheel', 'rearwheel', 'wheel_rear', 'wheel_r', 'wheel_b', 'back_wheel']);
 
-    // If we can't find specific wheel parts, try generic "wheel"
     if (!this.frontWheel && !this.rearWheel) {
       const wheels = [];
       bikeModel.traverse((child) => {
@@ -221,7 +213,6 @@ export class PlayerController {
         }
       });
       if (wheels.length >= 2) {
-        // Sort by Z position — front wheel is more negative Z (forward)
         wheels.sort((a, b) => {
           const posA = new THREE.Vector3();
           const posB = new THREE.Vector3();
@@ -234,45 +225,62 @@ export class PlayerController {
       }
     }
 
-    // If handlebar found, separate it into HandlebarForkAssembly
+    // ── Step 5: Separate handlebar into its own steering group ─
     if (this.handlebarAssembly) {
-      // Create a wrapper group for handlebar steering
       this.handlebarForkGroup = new THREE.Group();
       this.handlebarForkGroup.name = 'HandlebarForkAssembly';
 
-      // Get handlebar's world position relative to bike for pivot point
-      const hbWorldPos = new THREE.Vector3();
-      this.handlebarAssembly.getWorldPosition(hbWorldPos);
-
-      // Parent the handlebar into our fork group
       const parent = this.handlebarAssembly.parent;
       if (parent) parent.remove(this.handlebarAssembly);
       this.handlebarForkGroup.add(this.handlebarAssembly);
 
-      // If front wheel was child of handlebar, it's already there
-      // Otherwise add it to the fork group too
       if (this.frontWheel && !this.handlebarForkGroup.getObjectById(this.frontWheel.id)) {
         const fwParent = this.frontWheel.parent;
         if (fwParent) fwParent.remove(this.frontWheel);
         this.handlebarForkGroup.add(this.frontWheel);
       }
 
-      // Add fork group to lean pivot, then add remaining bike frame
       this.leanPivot.add(this.handlebarForkGroup);
 
-      // Remaining bike goes into FrameMeshGroup
       this.frameMeshGroup = bikeModel;
       this.frameMeshGroup.name = 'FrameMeshGroup';
       this.leanPivot.add(this.frameMeshGroup);
     } else {
-      // No handlebar found — treat entire bike as frame group
       this.handlebarForkGroup = null;
       this.frameMeshGroup = bikeModel;
       this.frameMeshGroup.name = 'FrameMeshGroup';
       this.leanPivot.add(this.frameMeshGroup);
     }
 
-    // Enable shadows on all bike meshes
+    // ── Step 6: Anchor bike so HANDLEBARS sit at camera target ─
+    // We want the handlebar center at (0, -0.35, -0.55) relative to camera.
+    // Camera is at (0, CAM_HEIGHT, 0) in leanPivot space.
+    // So handlebar target in leanPivot space = (0, CAM_HEIGHT - 0.35, -0.55)
+    const targetInLeanPivot = new THREE.Vector3(0, CAM_HEIGHT - 0.35, -0.55);
+
+    // Update matrices so we can compute world positions
+    this.leanPivot.updateMatrixWorld(true);
+
+    // Find the handlebar's current center in leanPivot local space
+    const anchorNode = this.handlebarAssembly || bikeModel;
+    const barBox = new THREE.Box3().setFromObject(anchorNode);
+    const barCenterWorld = barBox.getCenter(new THREE.Vector3());
+
+    // Convert bar center to leanPivot local space
+    const barCenterLocal = this.leanPivot.worldToLocal(barCenterWorld.clone());
+
+    // Compute offset to shift the entire bike so barCenter → targetInLeanPivot
+    const offsetToApply = new THREE.Vector3().subVectors(targetInLeanPivot, barCenterLocal);
+
+    // Apply offset to all direct children of leanPivot that are bike parts
+    if (this.handlebarForkGroup) {
+      this.handlebarForkGroup.position.add(offsetToApply);
+    }
+    this.frameMeshGroup.position.add(offsetToApply);
+
+    console.log(`🎯 Handlebar anchored: offset=(${offsetToApply.x.toFixed(2)}, ${offsetToApply.y.toFixed(2)}, ${offsetToApply.z.toFixed(2)})`);
+
+    // ── Enable shadows ──────────────────────────────────────
     bikeModel.traverse((child) => {
       if (child.isMesh) {
         child.castShadow = true;
@@ -282,48 +290,70 @@ export class PlayerController {
   }
 
   _setupGloves(glovesModel) {
-    // Right hand = original
+    // ── Step 1: Bounding-box scale normalization ─────────────
+    // Target: glove length (wrist to fingertip) ≈ 0.22m
+    const gloveBox = new THREE.Box3().setFromObject(glovesModel);
+    const gloveSize = gloveBox.getSize(new THREE.Vector3());
+    const longestAxis = Math.max(gloveSize.x, gloveSize.y, gloveSize.z);
+    const targetScale = 0.22 / Math.max(longestAxis, 0.001);
+
+    console.log(`🧤 Glove raw size: (${gloveSize.x.toFixed(2)}, ${gloveSize.y.toFixed(2)}, ${gloveSize.z.toFixed(2)}), scale=${targetScale.toFixed(4)}`);
+
+    // ── Step 2: Create right hand ────────────────────────────
     this.rightHand = glovesModel;
     this.rightHand.name = 'RightHand';
+    this.rightHand.scale.set(targetScale, targetScale, targetScale);
 
-    // Left hand = mirrored clone
+    // ── Step 3: Create mirrored left hand ────────────────────
     this.leftHand = glovesModel.clone(true);
     this.leftHand.name = 'LeftHand';
-    this.leftHand.scale.x = -1; // Mirror on X
+    this.leftHand.scale.set(-targetScale, targetScale, targetScale);
 
     // Fix backface culling on mirrored geometry
     this.leftHand.traverse((child) => {
       if (child.isMesh && child.material) {
         const mats = Array.isArray(child.material) ? child.material : [child.material];
         mats.forEach((m) => {
-          m = m.clone(); // Don't modify shared materials
-          m.side = THREE.DoubleSide;
-          child.material = m;
+          const cloned = m.clone();
+          cloned.side = THREE.DoubleSide;
+          child.material = cloned;
         });
       }
     });
 
-    // Scale gloves to match bike
-    const gloveScale = 0.15;
-    this.rightHand.scale.multiplyScalar(gloveScale);
-    this.leftHand.scale.set(
-      this.leftHand.scale.x * gloveScale,
-      this.leftHand.scale.y * gloveScale,
-      this.leftHand.scale.z * gloveScale
-    );
+    // ── Step 4: Grip rotation (palms down, fingers wrapping forward) ─
+    const gripRotation = new THREE.Euler(Math.PI / 3, -0.2, -Math.PI / 2);
+    this.rightHand.rotation.copy(gripRotation);
+    // Left hand: mirror the Y rotation
+    this.leftHand.rotation.set(Math.PI / 3, 0.2, Math.PI / 2);
 
-    // Position gloves on handlebars (or at default grip positions)
-    const gripSpread = 0.25;  // distance from center to each grip
-    const gripHeight = 1.0;   // height of handlebars
-    const gripForward = -0.4; // forward offset
+    // ── Step 5: Position on handlebar grips ──────────────────
+    // Attach as children of handlebar node so they steer with it.
+    const attachTarget = this.handlebarAssembly || this.handlebarForkGroup || this.leanPivot;
 
-    this.rightHand.position.set(gripSpread, gripHeight, gripForward);
-    this.leftHand.position.set(-gripSpread, gripHeight, gripForward);
+    // Compute handlebar grip endpoints in the attach target's local space
+    const barBox = new THREE.Box3().setFromObject(attachTarget);
+    const barCenter = barBox.getCenter(new THREE.Vector3());
+    const barSize = barBox.getSize(new THREE.Vector3());
 
-    // Attach to handlebar fork group or lean pivot
-    const attachTarget = this.handlebarForkGroup || this.leanPivot;
+    // Convert bar center to attachTarget local space
+    attachTarget.updateMatrixWorld(true);
+    const barCenterLocal = attachTarget.worldToLocal(barCenter.clone());
+
+    // Grip spread = half the handlebar width, capped at 0.35m
+    const gripSpread = Math.min(barSize.x * 0.5 * 0.8, 0.35);
+    // Grip height = bar center Y in local space
+    const gripY = barCenterLocal.y;
+    // Grip forward = bar center Z in local space
+    const gripZ = barCenterLocal.z;
+
+    this.rightHand.position.set(gripSpread, gripY, gripZ);
+    this.leftHand.position.set(-gripSpread, gripY, gripZ);
+
     attachTarget.add(this.rightHand);
     attachTarget.add(this.leftHand);
+
+    console.log(`🧤 Gloves attached at spread=${gripSpread.toFixed(2)}, y=${gripY.toFixed(2)}, z=${gripZ.toFixed(2)}`);
   }
 
   // ── Update (called every frame) ────────────────────────────
