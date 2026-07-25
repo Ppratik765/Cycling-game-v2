@@ -69,7 +69,7 @@ async function init() {
 
   // ── Register all loading steps with weights ─────────────
   const stepTextures  = progress.addStep('Loading terrain textures…', 3);
-  const stepModels    = progress.addStep('Loading bike & gloves…', 3);
+  const stepModels    = progress.addStep('Loading your ride…', 3);
   const stepSkybox    = progress.addStep('Loading skybox…', 2);
   const stepTerrain   = progress.addStep('Generating terrain…', 2);
   const stepFoliage   = progress.addStep('Planting foliage…', 1);
@@ -229,7 +229,7 @@ async function init() {
       loadGLTF('/carbon_frame_bike.glb'),
       loadGLTF('/biker_gloves.glb'),
     ]);
-    console.log('✅ Bike & gloves loaded');
+    console.log('✅ Your ride loaded');
     progress.completeStep(stepModels);
 
     // ── Player Controller ─────────────────────────────────────
