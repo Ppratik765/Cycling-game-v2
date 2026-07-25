@@ -108,6 +108,41 @@ function findLocalAxle(wheel, defaultAxis = new THREE.Vector3(1, 0, 0)) {
   }
 }
 
+// ── Helper: Curl hand joints/bones into a closed racing fist around grips ─
+function curlGloveFist(handModel, isLeft) {
+  if (!handModel) return;
+  let jointsCurled = 0;
+  handModel.traverse((child) => {
+    const name = (child.name || '').toLowerCase();
+    const isFinger = name.includes('finger') || name.includes('thumb') || 
+                     name.includes('index') || name.includes('middle') || 
+                     name.includes('ring') || name.includes('pinky') || 
+                     name.includes('little') || name.includes('joint') || 
+                     name.includes('fist') || name.includes('phalanx') || child.isBone;
+    if (isFinger && child !== handModel) {
+      if (name.includes('thumb')) {
+        child.rotation.x += isLeft ? 0.7 : 0.7;
+        child.rotation.y += isLeft ? -0.5 : 0.5;
+        child.rotation.z += isLeft ? 0.4 : -0.4;
+      } else {
+        child.rotation.x += -1.05; // Curl main fingers securely around grip
+        if (child.rotation.z !== undefined) child.rotation.z *= 0.5;
+      }
+      jointsCurled++;
+    }
+    if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
+      for (const [key, idx] of Object.entries(child.morphTargetDictionary)) {
+        if (key.toLowerCase().match(/(fist|close|grip|clench|grasp)/)) {
+          child.morphTargetInfluences[idx] = 1.0;
+        }
+      }
+    }
+  });
+  if (jointsCurled > 0) {
+    console.log(`✊ Clenched ${jointsCurled} joints into fist (${isLeft ? 'Left' : 'Right'} hand)`);
+  }
+}
+
 export class PlayerController {
   /**
    * @param {object} opts
@@ -221,10 +256,32 @@ export class PlayerController {
   }
 
   _setupBikeModel(bikeModel) {
-    // ── Step 1: Scale & Orient Bike Model ────────────────────
-    // GLTF forward axis is +X → rotate -90° around Y so front faces -Z.
+    // ── Step 1: Scale & Auto-Align Bike Orientation Straight Ahead (-Z) ──
     bikeModel.name = 'BikeModel';
-    bikeModel.rotation.y = -Math.PI / 2;
+    bikeModel.rotation.set(0, 0, 0);
+    bikeModel.updateMatrixWorld(true);
+
+    // Dynamically calculate forward vector from rear axle to front assembly
+    const fWheelTemp = findNodeByKeyword(bikeModel, ['zb_vr', 'radvorne', 'gabel', 'lenker']);
+    const rWheelTemp = findNodeByKeyword(bikeModel, REAR_WHEEL_KEYWORDS);
+
+    if (fWheelTemp && rWheelTemp) {
+      const fPos = new THREE.Vector3();
+      const rPos = new THREE.Vector3();
+      fWheelTemp.getWorldPosition(fPos);
+      rWheelTemp.getWorldPosition(rPos);
+      const forwardDir = new THREE.Vector3().subVectors(fPos, rPos);
+      forwardDir.y = 0;
+      if (forwardDir.lengthSq() > 0.0001) {
+        forwardDir.normalize();
+        // Target straight forward direction is -Z (atan2(0, -1) = Math.PI)
+        bikeModel.rotation.y = Math.PI - Math.atan2(forwardDir.x, forwardDir.z);
+        console.log(`🧭 Bike automatically aligned straight ahead along -Z (Y-rotation: ${(bikeModel.rotation.y * 180 / Math.PI).toFixed(1)}°)`);
+      }
+    } else {
+      // Default positive rotation fallback if wheel nodes missing
+      bikeModel.rotation.y = Math.PI / 2;
+    }
 
     const rawBox = new THREE.Box3().setFromObject(bikeModel);
     const bikeHeight = rawBox.max.y - rawBox.min.y;
@@ -363,19 +420,44 @@ export class PlayerController {
       }
     });
 
-    // ── Step 4: Add directly to steeringPivot at handlebar grips ─
-    // Position at grips (+X right, -X left inside aligned steeringPivot space)
-    this.rightHand.position.set(0.32, 0, 0);
-    this.leftHand.position.set(-0.32, 0, 0);
+    // ── Step 4: Curl fingers into a closed fist to sell riding illusion ─
+    curlGloveFist(this.rightHand, false);
+    curlGloveFist(this.leftHand, true);
 
-    // Apply local rotations so palms face down/forward to grip handles
+    // Apply local rotations so palms face down/forward to wrap around handles
     this.rightHand.rotation.set(Math.PI / 3, -0.2, -Math.PI / 2);
     this.leftHand.rotation.set(Math.PI / 3, 0.2, Math.PI / 2);
 
+    // ── Step 5: Anchor directly onto exact 3D coordinates of handlebar grips ('Griffe') ─
     if (this.steeringPivot) {
+      this.steeringPivot.updateMatrixWorld(true);
+      const gripNodes = collectNodesByKeywords(this.steeringPivot, ['griff']);
+      const targetBox = new THREE.Box3();
+      if (gripNodes && gripNodes.length > 0) {
+        gripNodes.forEach(node => targetBox.expandByObject(node));
+      } else {
+        const fallbackNodes = collectNodesByKeywords(this.steeringPivot, ['lenker', 'bar', 'handle', 'steer']);
+        fallbackNodes.forEach(node => targetBox.expandByObject(node));
+      }
+
+      if (!targetBox.isEmpty()) {
+        const centerWorld = targetBox.getCenter(new THREE.Vector3());
+        const localCenter = this.steeringPivot.worldToLocal(centerWorld.clone());
+        const widthWorld = targetBox.max.x - targetBox.min.x;
+        const halfWidth = widthWorld > 0.15 ? (widthWorld * 0.5 * 0.82) : 0.32;
+
+        // Place right and left fists precisely onto rubber grips
+        this.rightHand.position.set(localCenter.x + halfWidth, localCenter.y + 0.01, localCenter.z - 0.02);
+        this.leftHand.position.set(localCenter.x - halfWidth, localCenter.y + 0.01, localCenter.z - 0.02);
+        console.log(`🎯 Fists positioned onto 'Griffe' at X=±${halfWidth.toFixed(3)}, Y=${localCenter.y.toFixed(3)}, Z=${localCenter.z.toFixed(3)}`);
+      } else {
+        this.rightHand.position.set(0.32, 0, 0);
+        this.leftHand.position.set(-0.32, 0, 0);
+      }
+
       this.steeringPivot.add(this.rightHand);
       this.steeringPivot.add(this.leftHand);
-      console.log('🧤 Both gloves anchored directly to steeringPivot at grips (±0.32, 0, 0)');
+      console.log('🧤 Both gloves anchored directly to steeringPivot at handlebar grips');
     } else {
       this.leanPivot.add(this.rightHand);
       this.leanPivot.add(this.leftHand);
