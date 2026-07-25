@@ -15,12 +15,12 @@ const BRAKE_DECEL       = 20.0;   // m/s² braking force (S while moving fwd)
 const REVERSE_MAX_SPEED = 6.0;    // m/s reverse
 const REVERSE_ACCEL     = 4.0;    // m/s² reverse acceleration
 
-const LEAN_MAX_DEG      = 25.0;   // max MotoGP lean roll in degrees
+const LEAN_MAX_DEG      = 22.0;   // max lean roll in degrees
 const LEAN_SPEED        = 2.0;    // lerp speed for lean
 const TURN_RATE         = 1.0;    // yaw rate multiplier
 
-const HANDLEBAR_MAX_DEG = 18.0;   // max handlebar steering angle
-const HANDLEBAR_SPEED   = 4.0;    // lerp speed for handlebar rotation
+const STEER_MAX_RAD     = 0.35;   // ±20° max handlebar steering
+const STEER_SPEED       = 5.0;    // lerp speed for handlebar rotation
 
 const CAM_HEIGHT        = 1.3;    // Y offset (GoPro chest mount height)
 const CAM_SMOOTH_POS    = 6.0;    // position spring stiffness
@@ -57,8 +57,13 @@ function trailCurveX(z) {
   return Math.sin(z * 0.02) * 25.0 + Math.sin(z * 0.008) * 40.0 + Math.sin(z * 0.05) * 8.0;
 }
 
-// ── Helper: find mesh by keyword in hierarchy ────────────────
-function findMeshByKeyword(root, keywords) {
+// ── German GLTF node keywords ────────────────────────────────
+const STEERING_KEYWORDS = ['lenker', 'gabel', 'griffe', 'griffseiten', 'bremshebel', 'zb_vr', 'radvorne'];
+const REAR_WHEEL_KEYWORDS = ['radhinten', 'zb_hr'];
+const SADDLE_KEYWORDS = ['sattel'];
+
+// ── Helper: find node by keyword in hierarchy ────────────────
+function findNodeByKeyword(root, keywords) {
   let found = null;
   root.traverse((child) => {
     if (found) return;
@@ -71,6 +76,21 @@ function findMeshByKeyword(root, keywords) {
     }
   });
   return found;
+}
+
+// ── Helper: collect ALL nodes matching keywords ──────────────
+function collectNodesByKeywords(root, keywords) {
+  const results = [];
+  root.traverse((child) => {
+    const name = (child.name || '').toLowerCase();
+    for (const kw of keywords) {
+      if (name.includes(kw)) {
+        results.push(child);
+        break;
+      }
+    }
+  });
+  return results;
 }
 
 export class PlayerController {
@@ -98,7 +118,7 @@ export class PlayerController {
     this.yaw          = Math.PI; // face -Z initially
     this.currentLean  = 0;
     this.currentSpeed = 0;
-    this.handlebarAngle = 0;
+    this.steerAngle = 0;
 
     // ── Suspension state ────────────────────────────────────
     this.suspensionOffset = 0;
@@ -181,8 +201,7 @@ export class PlayerController {
 
   _setupBikeModel(bikeModel) {
     // ── Step 1: Wrap bike in a rotation container ────────────
-    // The GLTF model's forward axis is along +X (handlebars go left-right).
-    // Rotate -90° around Y so the front wheel faces -Z (forward in Three.js).
+    // The GLTF forward axis is +X → rotate -90° Y so front faces -Z.
     this.bikeRotationWrapper = new THREE.Group();
     this.bikeRotationWrapper.name = 'BikeRotationWrapper';
     this.bikeRotationWrapper.rotation.y = -Math.PI / 2;
@@ -193,11 +212,9 @@ export class PlayerController {
     const desiredHeight = 1.1;
     const scale = desiredHeight / Math.max(bikeHeight, 0.01);
     bikeModel.scale.setScalar(scale);
-
-    // Add bike into the rotation wrapper
     this.bikeRotationWrapper.add(bikeModel);
 
-    // ── Step 3: Log hierarchy for debugging ──────────────────
+    // ── Step 3: Log hierarchy ───────────────────────────────
     console.log('🚲 Bike model hierarchy:');
     bikeModel.traverse((child) => {
       if (child.isMesh || child.isGroup) {
@@ -205,48 +222,79 @@ export class PlayerController {
       }
     });
 
-    // ── Step 4: Find handlebar node ──────────────────────────
-    this.handlebarAssembly = findMeshByKeyword(bikeModel,
-      ['handlebar', 'handle_bar', 'steering', 'steer']);
+    // ── Step 4: Create steeringAssembly from front-end nodes ─
+    // Collect all steering/front-fork/handlebar nodes
+    const steeringNodes = collectNodesByKeywords(bikeModel, STEERING_KEYWORDS);
+    console.log(`🔧 Found ${steeringNodes.length} steering nodes`);
 
-    // ── Step 5: Find wheels ──────────────────────────────────
-    this.frontWheel = findMeshByKeyword(bikeModel,
-      ['front_wheel', 'frontwheel', 'wheel_front', 'wheel_f']);
-    this.rearWheel = findMeshByKeyword(bikeModel,
-      ['rear_wheel', 'rearwheel', 'wheel_rear', 'wheel_r', 'wheel_b', 'back_wheel']);
+    // Create the steering assembly group
+    this.steeringAssembly = new THREE.Group();
+    this.steeringAssembly.name = 'SteeringAssembly';
 
-    if (!this.frontWheel && !this.rearWheel) {
-      const wheels = [];
-      bikeModel.traverse((child) => {
-        if ((child.name || '').toLowerCase().includes('wheel')) {
-          wheels.push(child);
-        }
+    // We need to compute the pivot point (head-tube center) BEFORE reparenting
+    this.bikeRotationWrapper.updateMatrixWorld(true);
+
+    if (steeringNodes.length > 0) {
+      // Find the combined bounding box center of all steering nodes
+      const steerBox = new THREE.Box3();
+      steeringNodes.forEach(n => steerBox.expandByObject(n));
+      const pivotWorld = steerBox.getCenter(new THREE.Vector3());
+      // Convert pivot to bikeRotationWrapper local space
+      const pivotLocal = this.bikeRotationWrapper.worldToLocal(pivotWorld.clone());
+      this.steeringAssembly.position.copy(pivotLocal);
+
+      // Reparent each steering node into the assembly
+      steeringNodes.forEach(node => {
+        const worldPos = new THREE.Vector3();
+        const worldQuat = new THREE.Quaternion();
+        const worldScale = new THREE.Vector3();
+        node.getWorldPosition(worldPos);
+        node.getWorldQuaternion(worldQuat);
+        node.getWorldScale(worldScale);
+
+        // Remove from old parent
+        if (node.parent) node.parent.remove(node);
+
+        // Add to steering assembly
+        this.steeringAssembly.add(node);
+
+        // Convert world transform to steeringAssembly local space
+        this.steeringAssembly.updateMatrixWorld(true);
+        const localPos = this.steeringAssembly.worldToLocal(worldPos);
+        node.position.copy(localPos);
+        // Preserve rotation relative to assembly
+        const assemblyQuatInv = new THREE.Quaternion();
+        this.steeringAssembly.getWorldQuaternion(assemblyQuatInv).invert();
+        node.quaternion.copy(assemblyQuatInv.multiply(worldQuat));
+        node.scale.copy(worldScale);
       });
-      if (wheels.length >= 2) {
-        this.bikeRotationWrapper.updateMatrixWorld(true);
-        wheels.sort((a, b) => {
-          const posA = new THREE.Vector3();
-          const posB = new THREE.Vector3();
-          a.getWorldPosition(posA);
-          b.getWorldPosition(posB);
-          return posA.z - posB.z;
-        });
-        this.frontWheel = wheels[0];
-        this.rearWheel = wheels[wheels.length - 1];
-      }
     }
 
-    // ── Step 6: Keep bike as one unit ────────────────────────
-    this.handlebarForkGroup = null;
+    // Add steeringAssembly into the rotation wrapper
+    this.bikeRotationWrapper.add(this.steeringAssembly);
+
+    // ── Step 5: Find wheel meshes by German names ────────────
+    // Front wheel should be inside steeringAssembly now
+    this.frontWheel = findNodeByKeyword(this.steeringAssembly, ['zb_vr', 'radvorne']);
+    // Rear wheel stays in the bike frame
+    this.rearWheel = findNodeByKeyword(bikeModel, REAR_WHEEL_KEYWORDS);
+
+    console.log(`🛞 Front wheel: ${this.frontWheel ? this.frontWheel.name : 'NOT FOUND'}`);
+    console.log(`🛞 Rear wheel: ${this.rearWheel ? this.rearWheel.name : 'NOT FOUND'}`);
+
+    // ── Step 6: Add entire bike wrapper to leanPivot ─────────
     this.frameMeshGroup = this.bikeRotationWrapper;
     this.frameMeshGroup.name = 'FrameMeshGroup';
     this.leanPivot.add(this.frameMeshGroup);
 
-    // ── Step 7: Anchor bike so handlebars sit in lower-center of camera ─
-    const targetInLeanPivot = new THREE.Vector3(0, CAM_HEIGHT - 0.35, -0.55);
+    // ── Step 7: Anchor so Lenker stem sits below camera ──────
+    // Target: handlebar stem at (0, CAM_HEIGHT - 0.38, -0.42) in leanPivot
+    const targetInLeanPivot = new THREE.Vector3(0, CAM_HEIGHT - 0.38, -0.42);
     this.leanPivot.updateMatrixWorld(true);
 
-    const anchorNode = this.handlebarAssembly || bikeModel;
+    // Find the handlebar node (Lenker) for anchoring
+    const lenkerNode = findNodeByKeyword(bikeModel, ['lenker']);
+    const anchorNode = lenkerNode || this.steeringAssembly;
     const barBox = new THREE.Box3().setFromObject(anchorNode);
     const barCenterWorld = barBox.getCenter(new THREE.Vector3());
     const barCenterLocal = this.leanPivot.worldToLocal(barCenterWorld.clone());
@@ -254,7 +302,7 @@ export class PlayerController {
     const offsetToApply = new THREE.Vector3().subVectors(targetInLeanPivot, barCenterLocal);
     this.frameMeshGroup.position.add(offsetToApply);
 
-    console.log(`🎯 Handlebar anchored: offset=(${offsetToApply.x.toFixed(2)}, ${offsetToApply.y.toFixed(2)}, ${offsetToApply.z.toFixed(2)})`);
+    console.log(`🎯 Handlebar anchored at offset=(${offsetToApply.x.toFixed(3)}, ${offsetToApply.y.toFixed(3)}, ${offsetToApply.z.toFixed(3)})`);
 
     // ── Enable shadows ──────────────────────────────────────
     bikeModel.traverse((child) => {
@@ -266,23 +314,23 @@ export class PlayerController {
   }
 
   _setupGloves(glovesModel) {
-    // ── Step 1: Bounding-box scale normalization ─────────────
+    // ── Step 1: Bounding-box scale to ~0.20m hand length ─────
     const gloveBox = new THREE.Box3().setFromObject(glovesModel);
     const gloveSize = gloveBox.getSize(new THREE.Vector3());
     const longestAxis = Math.max(gloveSize.x, gloveSize.y, gloveSize.z);
-    const targetScale = 0.22 / Math.max(longestAxis, 0.001);
+    const handScale = 0.20 / Math.max(longestAxis, 0.001);
 
-    console.log(`🧤 Glove raw size: (${gloveSize.x.toFixed(2)}, ${gloveSize.y.toFixed(2)}, ${gloveSize.z.toFixed(2)}), scale=${targetScale.toFixed(4)}`);
+    console.log(`🧤 Glove raw size: (${gloveSize.x.toFixed(2)}, ${gloveSize.y.toFixed(2)}, ${gloveSize.z.toFixed(2)}), scale=${handScale.toFixed(4)}`);
 
-    // ── Step 2: Create right hand ────────────────────────────
+    // ── Step 2: Right hand ───────────────────────────────────
     this.rightHand = glovesModel;
     this.rightHand.name = 'RightHand';
-    this.rightHand.scale.set(targetScale, targetScale, targetScale);
+    this.rightHand.scale.set(handScale, handScale, handScale);
 
-    // ── Step 3: Create mirrored left hand ────────────────────
+    // ── Step 3: Mirrored left hand ──────────────────────────
     this.leftHand = glovesModel.clone(true);
     this.leftHand.name = 'LeftHand';
-    this.leftHand.scale.set(-targetScale, targetScale, targetScale);
+    this.leftHand.scale.set(-handScale, handScale, handScale);
 
     this.leftHand.traverse((child) => {
       if (child.isMesh && child.material) {
@@ -299,18 +347,15 @@ export class PlayerController {
     this.rightHand.rotation.set(Math.PI / 3, -0.2, -Math.PI / 2);
     this.leftHand.rotation.set(Math.PI / 3, 0.2, Math.PI / 2);
 
-    // ── Step 5: Position at handlebar grip endpoints in leanPivot space ─
-    const gripSpread = 0.30;
-    const gripY = CAM_HEIGHT - 0.35;
-    const gripZ = -0.55;
+    // ── Step 5: Parent to steeringAssembly at grip positions ─
+    // Positions are in steeringAssembly local space
+    this.rightHand.position.set(0.32, 0.02, -0.02);
+    this.leftHand.position.set(-0.32, 0.02, -0.02);
 
-    this.rightHand.position.set(gripSpread, gripY, gripZ);
-    this.leftHand.position.set(-gripSpread, gripY, gripZ);
+    this.steeringAssembly.add(this.rightHand);
+    this.steeringAssembly.add(this.leftHand);
 
-    this.leanPivot.add(this.rightHand);
-    this.leanPivot.add(this.leftHand);
-
-    console.log(`🧤 Gloves attached at spread=${gripSpread.toFixed(2)}, y=${gripY.toFixed(2)}, z=${gripZ.toFixed(2)}`);
+    console.log('🧤 Gloves parented to steeringAssembly');
   }
 
   // ── Update (called every frame) ────────────────────────────
@@ -373,16 +418,15 @@ export class PlayerController {
       1.0 - Math.exp(-LEAN_SPEED * delta)
     );
 
-    // ── Handlebar steering angle ────────────────────────────
-    const maxHB = HANDLEBAR_MAX_DEG * (Math.PI / 180);
-    let targetHB = 0;
-    if (this.keys.a) targetHB =  maxHB;
-    if (this.keys.d) targetHB = -maxHB;
+    // ── Steering angle ──────────────────────────────────────
+    let targetSteer = 0;
+    if (this.keys.a) targetSteer =  STEER_MAX_RAD;
+    if (this.keys.d) targetSteer = -STEER_MAX_RAD;
 
-    this.handlebarAngle = THREE.MathUtils.lerp(
-      this.handlebarAngle,
-      targetHB,
-      1.0 - Math.exp(-HANDLEBAR_SPEED * delta)
+    this.steerAngle = THREE.MathUtils.lerp(
+      this.steerAngle,
+      targetSteer,
+      1.0 - Math.exp(-STEER_SPEED * delta)
     );
 
     // ── Yaw (turning) ───────────────────────────────────────
@@ -468,9 +512,9 @@ export class PlayerController {
     // ── Lean pivot: Z-axis roll ─────────────────────────────
     this.leanPivot.rotation.z = this.currentLean;
 
-    // ── Handlebar steering ──────────────────────────────────
-    if (this.handlebarForkGroup) {
-      this.handlebarForkGroup.rotation.y = this.handlebarAngle;
+    // ── Steering assembly yaw ───────────────────────────────
+    if (this.steeringAssembly) {
+      this.steeringAssembly.rotation.y = this.steerAngle;
     }
 
     // ── Wheel spin ──────────────────────────────────────────
