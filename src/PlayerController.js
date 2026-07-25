@@ -272,8 +272,8 @@ export class PlayerController {
     const barCenter = this.bikeContainer.worldToLocal(barCenterWorld.clone());
 
     // Offset bike model INSIDE container for an authentic head-mounted GoPro riding view
-    // Positioned at Y=-0.72m and Z=-0.52m so handlebars, suspension forks, AND spinning front wheel are cleanly visible!
-    bikeModel.position.set(-barCenter.x, -barCenter.y - 0.72, -barCenter.z - 0.52);
+    // Positioned at Y=-0.75m and Z=-0.62m (pulled back 10cm) so handlebars and front wheel remain cleanly framed!
+    bikeModel.position.set(-barCenter.x, -barCenter.y - 0.75, -barCenter.z - 0.62);
     bikeModel.updateMatrixWorld(true);
     console.log(`🎯 Handlebars & front wheel framed in GoPro view: position=(${bikeModel.position.x.toFixed(3)}, ${bikeModel.position.y.toFixed(3)}, ${bikeModel.position.z.toFixed(3)})`);
 

@@ -168,13 +168,9 @@ async function init() {
     const composer = new EffectComposer(renderer, { multisampling: 2 });
     composer.addPass(new RenderPass(scene, camera));
 
-    const ssaoEffect = new SSAOEffect(camera, scene.background, {
-      intensity: 1.5,
-      radius: 0.12,
-      luminanceInfluence: 0.6,
-    });
+    // Removed SSAOEffect because it causes intense flickering black noise/shadows on alpha-cutout grass planes!
     const vignetteEffect = new VignetteEffect({ darkness: 0.4, offset: 0.3 });
-    const effectPass = new EffectPass(camera, ssaoEffect, vignetteEffect);
+    const effectPass = new EffectPass(camera, vignetteEffect);
     composer.addPass(effectPass);
 
     // ── Splat Material ────────────────────────────────────────
