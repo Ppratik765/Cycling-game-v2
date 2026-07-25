@@ -42,7 +42,7 @@ function chunkSeed(cx, cz) {
 /** Pampas Grass Tuft: 3 intersecting tapered blades with slight top curve */
 function createPampasTuft() {
   const bladeW = 0.18;
-  const bladeH = 2.25;
+  const bladeH = 1.35;
   const segsH = 6; // Enough vertical segments for smooth bending
   const planes = [];
 
@@ -256,8 +256,8 @@ varying float vHeightRatio;
   // Instance world origin
   vec4 worldInst = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
 
-  // Height ratio: 0 at root, 1 at tip (blade height ~2.25)
-  vHeightRatio = clamp(position.y / 2.25, 0.0, 1.0);
+  // Height ratio: 0 at root, 1 at tip (blade height ~1.35)
+  vHeightRatio = clamp(position.y / 1.35, 0.0, 1.0);
   float heightWeight = pow(vHeightRatio, 1.6);
 
   // World position of this vertex (approximate)

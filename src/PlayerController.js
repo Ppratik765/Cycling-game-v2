@@ -567,18 +567,14 @@ export class PlayerController {
     const shakeX = (Math.random() - 0.5) * this.cameraShake;
     const shakeY = (Math.random() - 0.5) * this.cameraShake;
 
-    // Smoothly interpolate head orientation for fluid, natural human movement
-    this._smoothYaw = (this._smoothYaw || 0) + (((this.headYaw || 0) - (this._smoothYaw || 0)) * Math.min(delta * 16.0, 1.0));
-    this._smoothPitch = (this._smoothPitch || 0) + (((this.headPitch || 0) - (this._smoothPitch || 0)) * Math.min(delta * 16.0, 1.0));
-
     // Base helmet GoPro pitch (tilted -15° downward toward handlebars and front wheel)
     const basePitch = -0.26; // ~15° downward tilt to cleanly frame spinning front wheel!
 
     // Camera is parented to leanPivot; set local position + rotation
     this.camera.position.set(0, CAM_HEIGHT, 0);
     this.camera.rotation.set(
-      basePitch + this._smoothPitch + vibX + shakeX,
-      this._smoothYaw + vibZ * 0.2,
+      basePitch + vibX + shakeX,
+      0,
       vibY + shakeY,
       'YXZ'
     );
@@ -587,11 +583,6 @@ export class PlayerController {
   // ── Input Binding ──────────────────────────────────────────
 
   _bindInput() {
-    this.headYaw = 0.0;
-    this.headPitch = 0.0;
-    this._smoothYaw = 0.0;
-    this._smoothPitch = 0.0;
-
     const handler = (e, pressed) => {
       let key = e.key.toLowerCase();
 
@@ -608,33 +599,5 @@ export class PlayerController {
 
     window.addEventListener('keydown', (e) => handler(e, true));
     window.addEventListener('keyup', (e) => handler(e, false));
-
-    // ── Mouse / Cursor Free Look (with realistic human waist & neck limits) ──
-    const MOUSE_SENSITIVITY = 0.0025;
-    const MAX_YAW = 1.40;         // ~±80° max human left/right turn while seated gripping handlebars
-    const MAX_PITCH_UP = 0.55;    // ~+31° looking up at peaks and sky
-    const MAX_PITCH_DOWN = -0.85; // ~-48° looking straight down at spinning front wheel and axle
-
-    window.addEventListener('mousemove', (e) => {
-      // Supports both locked pointer and cursor hovering over window/canvas
-      const deltaX = e.movementX || 0;
-      const deltaY = e.movementY || 0;
-
-      if (Math.abs(deltaX) + Math.abs(deltaY) > 0) {
-        this.headYaw -= deltaX * MOUSE_SENSITIVITY;
-        this.headPitch -= deltaY * MOUSE_SENSITIVITY;
-
-        // Strictly enforce human anatomical boundaries (no unrealistic 360° spinning!)
-        this.headYaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, this.headYaw));
-        this.headPitch = Math.max(MAX_PITCH_DOWN, Math.min(MAX_PITCH_UP, this.headPitch));
-      }
-    });
-
-    // Click canvas to lock pointer for seamless free-view head turning
-    window.addEventListener('click', (e) => {
-      if (!document.pointerLockElement && e.target && e.target.tagName === 'CANVAS') {
-        e.target.requestPointerLock?.();
-      }
-    });
   }
 }
