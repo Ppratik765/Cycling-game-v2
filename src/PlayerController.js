@@ -271,11 +271,11 @@ export class PlayerController {
     const barCenterWorld = barBox.getCenter(new THREE.Vector3());
     const barCenter = this.bikeContainer.worldToLocal(barCenterWorld.clone());
 
-    // Offset bike model INSIDE container for an exciting head-mounted GoPro riding view
-    // Handlebars sit ~48cm below head camera and ~42cm ahead, displaying front bike half while saddle remains behind!
-    bikeModel.position.set(-barCenter.x, -barCenter.y - 0.48, -barCenter.z - 0.42);
+    // Offset bike model INSIDE container for an authentic head-mounted GoPro riding view
+    // Raised camera slightly (+16cm) and pulled back (+26cm) so trail and mountains are completely unobstructed ahead!
+    bikeModel.position.set(-barCenter.x, -barCenter.y - 0.64, -barCenter.z - 0.68);
     bikeModel.updateMatrixWorld(true);
-    console.log(`🎯 Handlebars framed in head GoPro view: position=(${bikeModel.position.x.toFixed(3)}, ${bikeModel.position.y.toFixed(3)}, ${bikeModel.position.z.toFixed(3)})`);
+    console.log(`🎯 Handlebars framed in raised head GoPro view: position=(${bikeModel.position.x.toFixed(3)}, ${bikeModel.position.y.toFixed(3)}, ${bikeModel.position.z.toFixed(3)})`);
 
     // ── Wheel Setup (German Naming) ──────────────────────────
     // Front wheel is inside steeringPivot; rear wheel is inside bikeModel

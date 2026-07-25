@@ -41,15 +41,15 @@ export class TerrainBackdrop {
 
       const angle = Math.atan2(z, x);
       
-      // Vertical peaks
+      // Vertical peaks (reduced amplitudes for slightly smaller, natural mountain peaks)
       const peakNoise =
-        noise(angle * 2.0, 0.0) * 80 +
-        noise(angle * 6.0, 1.0) * 35;
+        noise(angle * 2.0, 0.0) * 45 +
+        noise(angle * 6.0, 1.0) * 20;
         
       // Lateral ridges (ravines and cliffs)
       const ridgeNoise = 
-        noise(angle * 4.0, y * 0.005) * 40 + 
-        noise(angle * 14.0, y * 0.01) * 15;
+        noise(angle * 4.0, y * 0.005) * 35 + 
+        noise(angle * 14.0, y * 0.01) * 12;
 
       // Only displace the upper parts strongly, leaving the base smooth
       const heightNorm = (y + height / 2) / height; 
@@ -127,10 +127,17 @@ uniform vec3 uFogColor;
     this._fogColorUniform.value.copy(color);
   }
 
-  /** Call each frame — follows camera X, Z for parallax. */
-  update(camera) {
-    this.mesh.position.x = camera.position.x;
-    this.mesh.position.z = camera.position.z;
+  /** Call each frame — follows player/camera world X, Z for infinite horizon parallax so you never ride through mountains. */
+  update(target) {
+    if (target && (target.isCamera || target.isObject3D)) {
+      const worldPos = new THREE.Vector3();
+      target.getWorldPosition(worldPos);
+      this.mesh.position.x = worldPos.x;
+      this.mesh.position.z = worldPos.z;
+    } else if (target && target.x !== undefined && target.z !== undefined) {
+      this.mesh.position.x = target.x;
+      this.mesh.position.z = target.z;
+    }
   }
 
   _mulberry32(seed) {

@@ -312,8 +312,8 @@ async function init() {
       elapsed += delta;
       foliage.update(elapsed, playerPos);
 
-      // 4. Update backdrop parallax
-      backdrop.update(camera);
+      // 4. Update backdrop parallax (sync with player world position for infinite terrain illusion)
+      backdrop.update(playerPos);
 
       // 5. Follow sun light to player
       sunLight.position.set(

@@ -186,7 +186,10 @@ export class TerrainChunkManager {
     }
 
     geo.computeVertexNormals();
+    geo.computeBoundingBox();
+    geo.computeBoundingSphere();
     posAttr.needsUpdate = true;
+    mesh.frustumCulled = true;
 
     mesh.position.set(worldOriginX, 0, worldOriginZ);
     
