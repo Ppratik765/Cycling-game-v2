@@ -25,7 +25,7 @@ const STEER_SPEED = 5.0;    // lerp speed for handlebar rotation
 const CAM_HEIGHT = 1.65;   // Y offset (GoPro head/helmet mount height for seated rider)
 const CAM_SMOOTH_POS = 6.0;    // position spring stiffness
 const CAM_SMOOTH_ROT = 8.0;    // rotation spring stiffness
-const CAM_FOV = 88;     // GoPro-style wide FOV
+const CAM_FOV = 90;     // GoPro-style wide FOV
 const CAM_NEAR = 0.05;   // Near plane — prevent clipping gloves/bars
 
 const CAPSULE_HALF_H = 0.4;
@@ -309,11 +309,38 @@ export class PlayerController {
 
     console.log(`🧤 Glove centered & scaled: rawSize=(${rawSize.x.toFixed(2)}, ${rawSize.y.toFixed(2)}, ${rawSize.z.toFixed(2)}), scale=${handScale.toFixed(4)}`);
 
+    // Helper to curl fingers if skeleton bones are present
+    let hasBones = false;
+    const processGloveMesh = (mesh) => {
+      mesh.traverse((child) => {
+        // Detect bones for fist pose curling
+        if (child.isBone || child.type === 'Bone') {
+          hasBones = true;
+          const name = child.name.toLowerCase();
+          if (name.includes('finger') || name.includes('index') || name.includes('middle') || name.includes('ring') || name.includes('pinky') || name.includes('thumb')) {
+            // Apply local curling rotation to form a tight grip around the handlebar
+            child.rotation.x -= 1.1; // Major curl flexion
+            child.rotation.z -= 0.2; // Slight inward wrap
+          }
+        }
+        // Ensure DoubleSide rendering so mirrored left hand normals display properly
+        if (child.isMesh && child.material) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach((m) => {
+            const cloned = m.clone();
+            cloned.side = THREE.DoubleSide;
+            child.material = cloned;
+          });
+        }
+      });
+    };
+
     // ── Step 2: Create centered Right Hand wrapper ───────────
     this.rightHand = new THREE.Group();
     this.rightHand.name = 'RightHandWrapper';
     const rightGloveMesh = glovesModel;
     rightGloveMesh.position.copy(rawCenter).multiplyScalar(-1); // Center mesh before rotation
+    processGloveMesh(rightGloveMesh);
     this.rightHand.add(rightGloveMesh);
     this.rightHand.scale.set(handScale, handScale, handScale);
 
@@ -322,29 +349,19 @@ export class PlayerController {
     this.leftHand.name = 'LeftHandWrapper';
     const leftGloveMesh = glovesModel.clone(true);
     leftGloveMesh.position.copy(rawCenter).multiplyScalar(-1);
+    processGloveMesh(leftGloveMesh);
     this.leftHand.add(leftGloveMesh);
     this.leftHand.scale.set(-handScale, handScale, handScale);
 
-    leftGloveMesh.traverse((child) => {
-      if (child.isMesh && child.material) {
-        const mats = Array.isArray(child.material) ? child.material : [child.material];
-        mats.forEach((m) => {
-          const cloned = m.clone();
-          cloned.side = THREE.DoubleSide;
-          child.material = cloned;
-        });
-      }
-    });
-
     // ── Step 4: Snap directly to left/right rubber grips inside steering assembly ──
-    // In Lenker_285 local space after straightening, the left and right rubber handlebar grips sit exactly at X=0.031, Y=±0.3265, Z=0.036
     this.leftHand.position.set(0.0310, 0.3262, 0.0362);
     this.rightHand.position.set(0.0310, -0.3267, 0.0363);
 
-    // Apply palm-down fist rotation (+1.60 rad Z flip) so open palms clamp DOWNWARD over the top
-    // of the rubber handlebar grips with knuckles facing up and fingers wrapped underneath!
-    this.rightHand.rotation.set(-0.04, 0.76, 1.60);
-    this.leftHand.rotation.set(-0.04, 0.76, 1.60);
+    // Apply baseline palm-down rotation + static pitch fallback if no skeleton exists
+    const pitchFallback = hasBones ? 0 : 0.8; // ~45 deg pitch forward if rigid mesh
+    // Start with a 180 flip approximation (User can refine in real-time with I/K, J/L, U/O)
+    this.rightHand.rotation.set(3.10 + pitchFallback, -0.76, 1.54); 
+    this.leftHand.rotation.copy(this.rightHand.rotation);
 
     if (this.steeringPivot) {
       this.steeringPivot.add(this.rightHand);
@@ -594,6 +611,25 @@ export class PlayerController {
       if (key in this.keys) {
         this.keys[key] = pressed;
         e.preventDefault();
+      }
+
+      // ── Glove Euler Dev Adjustment (I/K=Pitch, J/L=Yaw, U/O=Roll) ──
+      if (pressed && this.rightHand && this.leftHand) {
+        const step = 0.05; // ~3 degrees
+        let changed = false;
+        
+        if (key === 'i') { this.rightHand.rotation.x += step; changed = true; }
+        if (key === 'k') { this.rightHand.rotation.x -= step; changed = true; }
+        if (key === 'j') { this.rightHand.rotation.y += step; changed = true; }
+        if (key === 'l') { this.rightHand.rotation.y -= step; changed = true; }
+        if (key === 'u') { this.rightHand.rotation.z += step; changed = true; }
+        if (key === 'o') { this.rightHand.rotation.z -= step; changed = true; }
+
+        if (changed) {
+          // Mirror rotation to the left hand and log it!
+          this.leftHand.rotation.copy(this.rightHand.rotation);
+          console.log(`🛠️ [GLOVE DEV] New Rotation: set(${this.rightHand.rotation.x.toFixed(2)}, ${this.rightHand.rotation.y.toFixed(2)}, ${this.rightHand.rotation.z.toFixed(2)})`);
+        }
       }
     };
 
