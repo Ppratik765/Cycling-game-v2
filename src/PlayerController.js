@@ -299,6 +299,32 @@ export class PlayerController {
     });
   }
 
+  _curlFingers(handMesh, isLeft) {
+    let bonesFound = 0;
+    handMesh.traverse((child) => {
+      if (child.isBone) {
+        const name = child.name.toLowerCase();
+        // Curl index, middle, ring, pinky
+        if (name.includes('finger') || name.includes('index') || name.includes('middle') || name.includes('ring') || name.includes('pinky')) {
+          child.rotation.x += 1.2; 
+          bonesFound++;
+        }
+        // Curl thumb
+        if (name.includes('thumb')) {
+          child.rotation.y += (isLeft ? -0.5 : 0.5);
+          child.rotation.z += 0.5;
+          bonesFound++;
+        }
+      }
+    });
+    
+    if (bonesFound > 0) {
+      console.log(`🦴 Dynamically curled ${bonesFound} finger bones on ${isLeft ? 'Left' : 'Right'} hand!`);
+    } else {
+      console.log(`⚠️ No bones found in ${isLeft ? 'Left' : 'Right'} hand. Mesh is static.`);
+    }
+  }
+
   _setupGloves(glovesModel) {
     // ── Step 1: Center and scale raw glove geometry (~0.16m fist size) ──
     const rawBox = new THREE.Box3().setFromObject(glovesModel);
@@ -309,38 +335,11 @@ export class PlayerController {
 
     console.log(`🧤 Glove centered & scaled: rawSize=(${rawSize.x.toFixed(2)}, ${rawSize.y.toFixed(2)}, ${rawSize.z.toFixed(2)}), scale=${handScale.toFixed(4)}`);
 
-    // Helper to curl fingers if skeleton bones are present
-    let hasBones = false;
-    const processGloveMesh = (mesh) => {
-      mesh.traverse((child) => {
-        // Detect bones for fist pose curling
-        if (child.isBone || child.type === 'Bone') {
-          hasBones = true;
-          const name = child.name.toLowerCase();
-          if (name.includes('finger') || name.includes('index') || name.includes('middle') || name.includes('ring') || name.includes('pinky') || name.includes('thumb')) {
-            // Apply local curling rotation to form a tight grip around the handlebar
-            child.rotation.x -= 1.1; // Major curl flexion
-            child.rotation.z -= 0.2; // Slight inward wrap
-          }
-        }
-        // Ensure DoubleSide rendering so mirrored left hand normals display properly
-        if (child.isMesh && child.material) {
-          const mats = Array.isArray(child.material) ? child.material : [child.material];
-          mats.forEach((m) => {
-            const cloned = m.clone();
-            cloned.side = THREE.DoubleSide;
-            child.material = cloned;
-          });
-        }
-      });
-    };
-
     // ── Step 2: Create centered Right Hand wrapper ───────────
     this.rightHand = new THREE.Group();
     this.rightHand.name = 'RightHandWrapper';
     const rightGloveMesh = glovesModel;
     rightGloveMesh.position.copy(rawCenter).multiplyScalar(-1); // Center mesh before rotation
-    processGloveMesh(rightGloveMesh);
     this.rightHand.add(rightGloveMesh);
     this.rightHand.scale.set(handScale, handScale, handScale);
 
@@ -349,19 +348,32 @@ export class PlayerController {
     this.leftHand.name = 'LeftHandWrapper';
     const leftGloveMesh = glovesModel.clone(true);
     leftGloveMesh.position.copy(rawCenter).multiplyScalar(-1);
-    processGloveMesh(leftGloveMesh);
     this.leftHand.add(leftGloveMesh);
     this.leftHand.scale.set(-handScale, handScale, handScale);
 
+    leftGloveMesh.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach((m) => {
+          const cloned = m.clone();
+          cloned.side = THREE.DoubleSide;
+          child.material = cloned;
+        });
+      }
+    });
+
     // ── Step 4: Snap directly to left/right rubber grips inside steering assembly ──
+    // In Lenker_285 local space after straightening, the left and right rubber handlebar grips sit exactly at X=0.031, Y=±0.3265, Z=0.036
     this.leftHand.position.set(0.0310, 0.3262, 0.0362);
     this.rightHand.position.set(0.0310, -0.3267, 0.0363);
 
-    // Apply baseline palm-down rotation + static pitch fallback if no skeleton exists
-    const pitchFallback = hasBones ? 0 : 0.8; // ~45 deg pitch forward if rigid mesh
-    // Start with a 180 flip approximation (User can refine in real-time with I/K, J/L, U/O)
-    this.rightHand.rotation.set(3.10 + pitchFallback, -0.76, 1.54); 
-    this.leftHand.rotation.copy(this.rightHand.rotation);
+    // Apply an initial baseline rotation to flip the palms downward (-Y) and point fingers forward
+    this.rightHand.rotation.set(-1.57, 0, 0);
+    this.leftHand.rotation.set(-1.57, 0, 0);
+
+    // Attempt dynamic finger curling if the mesh has bones!
+    this._curlFingers(this.rightHand, false);
+    this._curlFingers(this.leftHand, true);
 
     if (this.steeringPivot) {
       this.steeringPivot.add(this.rightHand);
@@ -371,6 +383,56 @@ export class PlayerController {
       this.leanPivot.add(this.rightHand);
       this.leanPivot.add(this.leftHand);
     }
+
+    // ── DEV RIG: Manual Glove Tuning ──────────────────────────
+    window.addEventListener('keydown', (e) => {
+      const posDelta = 0.01;
+      const rotDelta = 0.05;
+      
+      switch (e.key) {
+        // Right Hand Rotation
+        case 'i': case 'I': this.rightHand.rotation.x += rotDelta; break;
+        case 'k': case 'K': this.rightHand.rotation.x -= rotDelta; break;
+        case 'j': case 'J': this.rightHand.rotation.y += rotDelta; break;
+        case 'l': case 'L': this.rightHand.rotation.y -= rotDelta; break;
+        case 'u': case 'U': this.rightHand.rotation.z += rotDelta; break;
+        case 'o': case 'O': this.rightHand.rotation.z -= rotDelta; break;
+        // Right Hand Position
+        case 'ArrowLeft': this.rightHand.position.x -= posDelta; break;
+        case 'ArrowRight': this.rightHand.position.x += posDelta; break;
+        case 'ArrowDown': this.rightHand.position.y -= posDelta; break;
+        case 'ArrowUp': this.rightHand.position.y += posDelta; break;
+        case 'PageUp': this.rightHand.position.z -= posDelta; break;
+        case 'PageDown': this.rightHand.position.z += posDelta; break;
+
+        // Left Hand Rotation
+        case 'w': case 'W': this.leftHand.rotation.x += rotDelta; break;
+        case 's': case 'S': this.leftHand.rotation.x -= rotDelta; break;
+        case 'a': case 'A': this.leftHand.rotation.y += rotDelta; break;
+        case 'd': case 'D': this.leftHand.rotation.y -= rotDelta; break;
+        case 'q': case 'Q': this.leftHand.rotation.z += rotDelta; break;
+        case 'e': case 'E': this.leftHand.rotation.z -= rotDelta; break;
+        // Left Hand Position
+        case 'f': case 'F': this.leftHand.position.x -= posDelta; break;
+        case 'h': case 'H': this.leftHand.position.x += posDelta; break;
+        case 't': case 'T': this.leftHand.position.y += posDelta; break;
+        case 'g': case 'G': this.leftHand.position.y -= posDelta; break;
+        case 'r': case 'R': this.leftHand.position.z -= posDelta; break;
+        case 'y': case 'Y': this.leftHand.position.z += posDelta; break;
+
+        // Print State
+        case 'p': case 'P':
+          console.log(`
+// ── COPIED TUNE STATE ──
+this.leftHand.position.set(${this.leftHand.position.x.toFixed(4)}, ${this.leftHand.position.y.toFixed(4)}, ${this.leftHand.position.z.toFixed(4)});
+this.leftHand.rotation.set(${this.leftHand.rotation.x.toFixed(4)}, ${this.leftHand.rotation.y.toFixed(4)}, ${this.leftHand.rotation.z.toFixed(4)});
+
+this.rightHand.position.set(${this.rightHand.position.x.toFixed(4)}, ${this.rightHand.position.y.toFixed(4)}, ${this.rightHand.position.z.toFixed(4)});
+this.rightHand.rotation.set(${this.rightHand.rotation.x.toFixed(4)}, ${this.rightHand.rotation.y.toFixed(4)}, ${this.rightHand.rotation.z.toFixed(4)});
+          `);
+          break;
+      }
+    });
   }
 
   // ── Update (called every frame) ────────────────────────────
@@ -600,8 +662,15 @@ export class PlayerController {
   // ── Input Binding ──────────────────────────────────────────
 
   _bindInput() {
+    window.DEV_TUNE_MODE = true; // Temporary flag for glove tuning
+
     const handler = (e, pressed) => {
       let key = e.key.toLowerCase();
+
+      // Disable biking input while tuning so the bike doesn't drive away!
+      if (window.DEV_TUNE_MODE && ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+        return;
+      }
 
       if (key === 'arrowup') key = 'w';
       if (key === 'arrowdown') key = 's';
@@ -611,25 +680,6 @@ export class PlayerController {
       if (key in this.keys) {
         this.keys[key] = pressed;
         e.preventDefault();
-      }
-
-      // ── Glove Euler Dev Adjustment (I/K=Pitch, J/L=Yaw, U/O=Roll) ──
-      if (pressed && this.rightHand && this.leftHand) {
-        const step = 0.05; // ~3 degrees
-        let changed = false;
-        
-        if (key === 'i') { this.rightHand.rotation.x += step; changed = true; }
-        if (key === 'k') { this.rightHand.rotation.x -= step; changed = true; }
-        if (key === 'j') { this.rightHand.rotation.y += step; changed = true; }
-        if (key === 'l') { this.rightHand.rotation.y -= step; changed = true; }
-        if (key === 'u') { this.rightHand.rotation.z += step; changed = true; }
-        if (key === 'o') { this.rightHand.rotation.z -= step; changed = true; }
-
-        if (changed) {
-          // Mirror rotation to the left hand and log it!
-          this.leftHand.rotation.copy(this.rightHand.rotation);
-          console.log(`🛠️ [GLOVE DEV] New Rotation: set(${this.rightHand.rotation.x.toFixed(2)}, ${this.rightHand.rotation.y.toFixed(2)}, ${this.rightHand.rotation.z.toFixed(2)})`);
-        }
       }
     };
 
