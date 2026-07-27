@@ -8,7 +8,7 @@ import * as THREE from 'three';
 
 // ── Constants ────────────────────────────────────────────────
 
-const GRASS_PER_CHUNK = 22000;
+const GRASS_PER_CHUNK = 12000;
 const PINE_PER_CHUNK = 40;
 const BROADLEAF_PER_CHUNK = 20;
 
@@ -677,9 +677,9 @@ export class FoliageSystem {
     };
 
     addIM(this._grassGeo, this._grassMat, grassBuffer, grassCount, 'grass', false, grassColors);
-    addIM(this._pineCanopyGeo, this._pineLeafMat, pineBuffer, pineCount, 'pineCanopy', true);
+    addIM(this._pineCanopyGeo, this._pineLeafMat, pineBuffer, pineCount, 'pineCanopy', false);
     addIM(this._pineTrunkGeo, this._trunkMat, pineBuffer, pineCount, 'pineTrunk', true);
-    addIM(this._broadCanopyGeo, this._broadLeafMat, broadBuffer, broadCount, 'broadCanopy', true);
+    addIM(this._broadCanopyGeo, this._broadLeafMat, broadBuffer, broadCount, 'broadCanopy', false);
     addIM(this._broadTrunkGeo, this._trunkMat, broadBuffer, broadCount, 'broadTrunk', true);
 
     saveEntry(entry);
