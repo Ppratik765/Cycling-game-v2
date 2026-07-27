@@ -186,7 +186,7 @@ async function init() {
     await LoadingProgress.yieldToUI(); // Let the browser paint before heavy sync work
 
     const foliage = new FoliageSystem(scene, noiseGen);
-    const petals = new PetalParticleSystem(scene, 2000);
+    const petals = new PetalParticleSystem(scene, 2500);
 
     const chunkManager = new TerrainChunkManager({
       scene,

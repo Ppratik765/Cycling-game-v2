@@ -18,12 +18,12 @@ export class PetalParticleSystem {
     const petalTex = texLoader.load('/textures/cherry_blossom_petal.png');
     petalTex.colorSpace = THREE.SRGBColorSpace;
 
-    this.material = new THREE.MeshBasicMaterial({
+    this.material = new THREE.MeshStandardMaterial({
       color: 0xffe4e1, // misty rose tint
       map: petalTex,
       side: THREE.DoubleSide,
-      transparent: true,
-      depthWrite: false, // Prevents alpha sorting issues for tiny particles
+      roughness: 0.8,
+      depthWrite: true, // Standard depth write since we are discarding pixels instead of blending
     });
 
     this.uTime = { value: 0 };
