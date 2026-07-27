@@ -317,7 +317,7 @@ varying float vHeightRatio;
 }
 
 function createLeafMaterial(baseColor, type, uTimeRef) {
-  const leafTex = new THREE.TextureLoader().load('/textures/leaf_cluster_alpha.png?v=3');
+  const leafTex = new THREE.TextureLoader().load('/textures/cherry_blossom_cluster_alpha.png');
   leafTex.colorSpace = THREE.SRGBColorSpace;
 
   const mat = new THREE.MeshStandardMaterial({
@@ -360,16 +360,14 @@ uniform float uTime;
 `
     );
 
-    // AI Chroma-Key: Discards grey/white/black backgrounds based on raw texture color
+    // Chroma-Key: Discards black background (from AI generated texture)
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <alphatest_fragment>',
       `
       #include <alphatest_fragment>
       #ifdef USE_MAP
         vec4 texelColorRaw = texture2D( map, vMapUv );
-        float maxC = max(texelColorRaw.r, max(texelColorRaw.g, texelColorRaw.b));
-        float minC = min(texelColorRaw.r, min(texelColorRaw.g, texelColorRaw.b));
-        if (maxC - minC < 0.065) discard;
+        if (texelColorRaw.r < 0.1 && texelColorRaw.g < 0.1 && texelColorRaw.b < 0.1) discard;
         diffuseColor.a = 1.0;
       #endif
       `
@@ -413,8 +411,8 @@ export class FoliageSystem {
 
     // Shared materials
     this._grassMat = createPampasMaterial(this.uTime, this.uPlayerPos);
-    this._pineLeafMat = createLeafMaterial(0x3a6630, 'pine', this.uTime);    // Desaturated pine green
-    this._broadLeafMat = createLeafMaterial(0x4a7a3a, 'broadleaf', this.uTime); // Desaturated broadleaf
+    this._pineLeafMat = createLeafMaterial(0xffffff, 'pine', this.uTime);    // Pure white blossoms
+    this._broadLeafMat = createLeafMaterial(0xffb7c5, 'broadleaf', this.uTime); // Light pink blossoms
     this._trunkMat = createTrunkMaterial();
 
     this.chunkFoliage = new Map();

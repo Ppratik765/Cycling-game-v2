@@ -32,6 +32,7 @@ import { TerrainBackdrop } from './TerrainBackdrop.js';
 import { TerrainChunkManager } from './TerrainChunkManager.js';
 import { PlayerController } from './PlayerController.js';
 import { FoliageSystem } from './FoliageSystem.js';
+import { PetalParticleSystem } from './PetalParticleSystem.js';
 import { LoadingProgress } from './LoadingProgress.js';
 
 /* ============================================================
@@ -185,6 +186,7 @@ async function init() {
     await LoadingProgress.yieldToUI(); // Let the browser paint before heavy sync work
 
     const foliage = new FoliageSystem(scene, noiseGen);
+    const petals = new PetalParticleSystem(scene, 5000);
 
     const chunkManager = new TerrainChunkManager({
       scene,
@@ -307,6 +309,7 @@ async function init() {
       // 3.5 Update foliage wind animation + player interaction
       elapsed += delta;
       foliage.update(elapsed, playerPos);
+      petals.update(elapsed, playerPos);
 
       // 4. Update backdrop parallax (sync with player world position for infinite terrain illusion)
       backdrop.update(playerPos);
