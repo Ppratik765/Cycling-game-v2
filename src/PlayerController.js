@@ -335,7 +335,16 @@ export class PlayerController {
 
     console.log(`🧤 Glove centered & scaled: rawSize=(${rawSize.x.toFixed(2)}, ${rawSize.y.toFixed(2)}, ${rawSize.z.toFixed(2)}), scale=${handScale.toFixed(4)}`);
 
-    // ── Step 2: Create centered Right Hand wrapper ───────────
+    // ── Step 2: Dynamic Clipping Planes (to cut off fingers) ──
+    // We create local planes assuming Z is the forward axis of the raw glove.
+    // We want to keep the wrist (negative Z) and discard the fingers (positive Z).
+    this.localClipPlaneRight = new THREE.Plane(new THREE.Vector3(0, 0, -1), longestAxis * 0.15);
+    this.worldClipPlaneRight = new THREE.Plane();
+
+    this.localClipPlaneLeft = new THREE.Plane(new THREE.Vector3(0, 0, -1), longestAxis * 0.15);
+    this.worldClipPlaneLeft = new THREE.Plane();
+
+    // ── Step 3: Create Right Hand wrapper & Clone Materials ──
     this.rightHand = new THREE.Group();
     this.rightHand.name = 'RightHandWrapper';
     const rightGloveMesh = glovesModel;
@@ -343,7 +352,20 @@ export class PlayerController {
     this.rightHand.add(rightGloveMesh);
     this.rightHand.scale.set(handScale, handScale, handScale);
 
-    // ── Step 3: Mirrored Left Hand wrapper (flip X scale across symmetry plane) ──
+    rightGloveMesh.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach((m) => {
+          const cloned = m.clone();
+          cloned.side = THREE.DoubleSide;
+          cloned.clippingPlanes = [this.worldClipPlaneRight];
+          cloned.clipShadows = true;
+          child.material = cloned;
+        });
+      }
+    });
+
+    // ── Step 4: Create Left Hand wrapper & Clone Materials ──
     this.leftHand = new THREE.Group();
     this.leftHand.name = 'LeftHandWrapper';
     const leftGloveMesh = glovesModel.clone(true);
@@ -357,12 +379,14 @@ export class PlayerController {
         mats.forEach((m) => {
           const cloned = m.clone();
           cloned.side = THREE.DoubleSide;
+          cloned.clippingPlanes = [this.worldClipPlaneLeft];
+          cloned.clipShadows = true;
           child.material = cloned;
         });
       }
     });
 
-    // ── Step 4: Final Hand Placement (Hardcoded from User Tune State) ──
+    // ── Step 5: Final Hand Placement (Hardcoded from User Tune State) ──
     this.leftHand.position.set(0.0310, 0.3162, 0.0462);
     this.leftHand.rotation.set(-12.3200, -2.8000, 1.2500);
 
@@ -393,6 +417,16 @@ export class PlayerController {
     this._updateSuspension(delta);
     this._updateVisuals(delta);
     this._updateCamera(delta);
+
+    // ── Update Glove Clipping Planes (to slice off fingers dynamically) ──
+    if (this.rightHand && this.localClipPlaneRight) {
+      this.rightHand.updateMatrixWorld(true);
+      this.worldClipPlaneRight.copy(this.localClipPlaneRight).applyMatrix4(this.rightHand.matrixWorld);
+    }
+    if (this.leftHand && this.localClipPlaneLeft) {
+      this.leftHand.updateMatrixWorld(true);
+      this.worldClipPlaneLeft.copy(this.localClipPlaneLeft).applyMatrix4(this.leftHand.matrixWorld);
+    }
   }
 
   getPosition() {

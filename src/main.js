@@ -92,6 +92,7 @@ async function init() {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.65; // Lower exposure for a moodier overcast look
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.localClippingEnabled = true;
     container.appendChild(renderer.domElement);
 
     // ── Scene ─────────────────────────────────────────────────
