@@ -5,8 +5,8 @@ export class PetalParticleSystem {
     this.scene = scene;
     this.count = count;
 
-    // A simple curved plane for a petal (scaled up based on feedback)
-    const geometry = new THREE.PlaneGeometry(0.25, 0.25, 2, 2);
+    // A simple curved plane for a petal (scaled to 0.18 to balance visibility and GPU fill-rate)
+    const geometry = new THREE.PlaneGeometry(0.18, 0.18, 2, 2);
     // Add slight curve
     const pos = geometry.attributes.position.array;
     for (let i = 0; i < pos.length; i += 3) {
@@ -82,16 +82,12 @@ export class PetalParticleSystem {
         float t = uTime * 1.5;
         float idOffset = instCenter.x * 0.1 + instCenter.y * 0.2 + instCenter.z * 0.3;
         
-        // Drift + Swirl
+        // Gentle Drift + Swirl + Fall (Removed aggressive directional wind so they stay anchored in world space)
         vec3 drift = vec3(
-          sin(t + idOffset) * 2.0 + sin(t * 0.5 + idOffset * 2.0) * 1.5,
-          -mod(t * 3.0 + idOffset * 10.0, 40.0) + 20.0, 
-          cos(t * 1.2 + idOffset) * 2.0 + sin(t * 0.8 + idOffset * 1.5) * 1.5
+          sin(t + idOffset) * 1.5 + sin(t * 0.5 + idOffset * 2.0) * 1.0,
+          -mod(t * 1.5 + idOffset * 10.0, 40.0) + 20.0, 
+          cos(t * 1.2 + idOffset) * 1.5 + sin(t * 0.8 + idOffset * 1.5) * 1.0
         );
-        
-        // Apply wind direction
-        drift.x += t * 2.0; 
-        drift.z -= t * 1.0;
         
         // Additional individual rotation animation (spinning while falling)
         float rotPhase = t * 3.0 + idOffset * 5.0;
