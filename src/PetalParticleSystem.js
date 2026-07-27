@@ -54,40 +54,55 @@ export class PetalParticleSystem {
       );
 
       shader.vertexShader = shader.vertexShader.replace(
-        '#include <begin_vertex>',
+        '#include <project_vertex>',
         `
-        vec4 worldInst = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+        vec4 mvPosition = vec4( transformed, 1.0 );
+        #ifdef USE_INSTANCING
+          mvPosition = instanceMatrix * mvPosition;
+        #endif
         
-        // Wrap logic: keep petals within a 60m radius of the player
+        // Extract instance center
+        #ifdef USE_INSTANCING
+          vec3 instCenter = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+        #else
+          vec3 instCenter = vec3(0.0);
+        #endif
+        
         float range = 120.0;
         float halfRange = 60.0;
         
-        vec3 localPos = worldInst.xyz - uPlayerPos;
-        vec3 wrappedPos = mod(localPos + halfRange, range) - halfRange + uPlayerPos;
+        // Wrap the INSTANCE CENTER around the player
+        vec3 centerLocal = instCenter - uPlayerPos;
+        vec3 centerWrapped = mod(centerLocal + halfRange, range) - halfRange + uPlayerPos;
+        
+        // Calculate the vertex offset from the instance center (preserves initial rotation and scale)
+        vec3 vertexOffset = mvPosition.xyz - instCenter;
         
         // Time-based wind physics
         float t = uTime * 1.5;
-        float idOffset = worldInst.x * 0.1 + worldInst.y * 0.2 + worldInst.z * 0.3;
+        float idOffset = instCenter.x * 0.1 + instCenter.y * 0.2 + instCenter.z * 0.3;
         
         // Drift + Swirl
         vec3 drift = vec3(
           sin(t + idOffset) * 2.0 + sin(t * 0.5 + idOffset * 2.0) * 1.5,
-          -mod(t * 3.0 + idOffset * 10.0, 40.0) + 20.0, // Falling logic inside wrapped height
+          -mod(t * 3.0 + idOffset * 10.0, 40.0) + 20.0, 
           cos(t * 1.2 + idOffset) * 2.0 + sin(t * 0.8 + idOffset * 1.5) * 1.5
         );
         
-        // Apply wind direction (blowing generally across the trail)
+        // Apply wind direction
         drift.x += t * 2.0; 
         drift.z -= t * 1.0;
-
-        // Animate individual rotation of the petal
+        
+        // Additional individual rotation animation (spinning while falling)
         float rotPhase = t * 3.0 + idOffset * 5.0;
         mat4 rot = rotationMatrix(normalize(vec3(sin(rotPhase), cos(rotPhase * 0.8), sin(rotPhase * 1.2))), rotPhase);
+        vec3 animatedVertexOffset = (rot * vec4(vertexOffset, 1.0)).xyz;
         
-        vec4 rotatedVertex = rot * vec4(position, 1.0);
-        vec3 finalPos = wrappedPos + drift + rotatedVertex.xyz;
+        // Final world position
+        vec3 finalWorldPos = centerWrapped + drift + animatedVertexOffset;
         
-        vec3 transformed = finalPos - worldInst.xyz; // Convert back to local space offset for standard pipeline
+        mvPosition = modelViewMatrix * vec4(finalWorldPos, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
         `
       );
 
