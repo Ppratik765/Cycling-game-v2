@@ -362,14 +362,12 @@ export class PlayerController {
       }
     });
 
-    // ── Step 4: Snap directly to left/right rubber grips inside steering assembly ──
-    // In Lenker_285 local space after straightening, the left and right rubber handlebar grips sit exactly at X=0.031, Y=±0.3265, Z=0.036
-    this.leftHand.position.set(0.0310, 0.3262, 0.0362);
-    this.rightHand.position.set(0.0310, -0.3267, 0.0363);
+    // ── Step 4: Final Hand Placement (Hardcoded from User Tune State) ──
+    this.leftHand.position.set(0.0310, 0.3162, 0.0462);
+    this.leftHand.rotation.set(-12.3200, -2.8000, 1.2500);
 
-    // Apply an initial baseline rotation to flip the palms downward (-Y) and point fingers forward
-    this.rightHand.rotation.set(-1.57, 0, 0);
-    this.leftHand.rotation.set(-1.57, 0, 0);
+    this.rightHand.position.set(0.0210, -0.3167, 0.0463);
+    this.rightHand.rotation.set(-0.1700, -2.8500, 1.8500);
 
     // Attempt dynamic finger curling if the mesh has bones!
     this._curlFingers(this.rightHand, false);
@@ -383,56 +381,6 @@ export class PlayerController {
       this.leanPivot.add(this.rightHand);
       this.leanPivot.add(this.leftHand);
     }
-
-    // ── DEV RIG: Manual Glove Tuning ──────────────────────────
-    window.addEventListener('keydown', (e) => {
-      const posDelta = 0.01;
-      const rotDelta = 0.05;
-      
-      switch (e.key) {
-        // Right Hand Rotation
-        case 'i': case 'I': this.rightHand.rotation.x += rotDelta; break;
-        case 'k': case 'K': this.rightHand.rotation.x -= rotDelta; break;
-        case 'j': case 'J': this.rightHand.rotation.y += rotDelta; break;
-        case 'l': case 'L': this.rightHand.rotation.y -= rotDelta; break;
-        case 'u': case 'U': this.rightHand.rotation.z += rotDelta; break;
-        case 'o': case 'O': this.rightHand.rotation.z -= rotDelta; break;
-        // Right Hand Position
-        case 'ArrowLeft': this.rightHand.position.x -= posDelta; break;
-        case 'ArrowRight': this.rightHand.position.x += posDelta; break;
-        case 'ArrowDown': this.rightHand.position.y -= posDelta; break;
-        case 'ArrowUp': this.rightHand.position.y += posDelta; break;
-        case 'PageUp': this.rightHand.position.z -= posDelta; break;
-        case 'PageDown': this.rightHand.position.z += posDelta; break;
-
-        // Left Hand Rotation
-        case 'w': case 'W': this.leftHand.rotation.x += rotDelta; break;
-        case 's': case 'S': this.leftHand.rotation.x -= rotDelta; break;
-        case 'a': case 'A': this.leftHand.rotation.y += rotDelta; break;
-        case 'd': case 'D': this.leftHand.rotation.y -= rotDelta; break;
-        case 'q': case 'Q': this.leftHand.rotation.z += rotDelta; break;
-        case 'e': case 'E': this.leftHand.rotation.z -= rotDelta; break;
-        // Left Hand Position
-        case 'f': case 'F': this.leftHand.position.x -= posDelta; break;
-        case 'h': case 'H': this.leftHand.position.x += posDelta; break;
-        case 't': case 'T': this.leftHand.position.y += posDelta; break;
-        case 'g': case 'G': this.leftHand.position.y -= posDelta; break;
-        case 'r': case 'R': this.leftHand.position.z -= posDelta; break;
-        case 'y': case 'Y': this.leftHand.position.z += posDelta; break;
-
-        // Print State
-        case 'p': case 'P':
-          console.log(`
-// ── COPIED TUNE STATE ──
-this.leftHand.position.set(${this.leftHand.position.x.toFixed(4)}, ${this.leftHand.position.y.toFixed(4)}, ${this.leftHand.position.z.toFixed(4)});
-this.leftHand.rotation.set(${this.leftHand.rotation.x.toFixed(4)}, ${this.leftHand.rotation.y.toFixed(4)}, ${this.leftHand.rotation.z.toFixed(4)});
-
-this.rightHand.position.set(${this.rightHand.position.x.toFixed(4)}, ${this.rightHand.position.y.toFixed(4)}, ${this.rightHand.position.z.toFixed(4)});
-this.rightHand.rotation.set(${this.rightHand.rotation.x.toFixed(4)}, ${this.rightHand.rotation.y.toFixed(4)}, ${this.rightHand.rotation.z.toFixed(4)});
-          `);
-          break;
-      }
-    });
   }
 
   // ── Update (called every frame) ────────────────────────────
@@ -662,15 +610,8 @@ this.rightHand.rotation.set(${this.rightHand.rotation.x.toFixed(4)}, ${this.righ
   // ── Input Binding ──────────────────────────────────────────
 
   _bindInput() {
-    window.DEV_TUNE_MODE = true; // Temporary flag for glove tuning
-
     const handler = (e, pressed) => {
       let key = e.key.toLowerCase();
-
-      // Disable biking input while tuning so the bike doesn't drive away!
-      if (window.DEV_TUNE_MODE && ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
-        return;
-      }
 
       if (key === 'arrowup') key = 'w';
       if (key === 'arrowdown') key = 's';
