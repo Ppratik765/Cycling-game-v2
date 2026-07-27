@@ -5,8 +5,8 @@ export class PetalParticleSystem {
     this.scene = scene;
     this.count = count;
 
-    // A simple curved plane for a petal
-    const geometry = new THREE.PlaneGeometry(0.12, 0.12, 2, 2);
+    // A simple curved plane for a petal (scaled up based on feedback)
+    const geometry = new THREE.PlaneGeometry(0.25, 0.25, 2, 2);
     // Add slight curve
     const pos = geometry.attributes.position.array;
     for (let i = 0; i < pos.length; i += 3) {
