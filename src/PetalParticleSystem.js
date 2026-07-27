@@ -5,25 +5,20 @@ export class PetalParticleSystem {
     this.scene = scene;
     this.count = count;
 
-    // A simple curved plane for a petal (scaled to 0.18 to balance visibility and GPU fill-rate)
-    const geometry = new THREE.PlaneGeometry(0.18, 0.18, 2, 2);
-    // Add slight curve
-    const pos = geometry.attributes.position.array;
-    for (let i = 0; i < pos.length; i += 3) {
-      pos[i + 2] += Math.sin(pos[i] * 10.0) * 0.02; 
-    }
+    // A simple plane for a petal (1x1 quad = 4 vertices, down from 9, saving 55% vertex load)
+    const geometry = new THREE.PlaneGeometry(0.18, 0.18, 1, 1);
     geometry.computeVertexNormals();
 
     const texLoader = new THREE.TextureLoader();
     const petalTex = texLoader.load('/textures/cherry_blossom_petal.png');
     petalTex.colorSpace = THREE.SRGBColorSpace;
 
-    this.material = new THREE.MeshStandardMaterial({
-      color: 0xffe4e1, // misty rose tint
+    // Basic Material skips heavy PBR lighting calculations entirely
+    this.material = new THREE.MeshBasicMaterial({
+      color: 0xffffff, // pure white, relying on texture
       map: petalTex,
       side: THREE.DoubleSide,
-      roughness: 0.8,
-      depthWrite: true, // Standard depth write since we are discarding pixels instead of blending
+      depthWrite: true, 
     });
 
     this.uTime = { value: 0 };
