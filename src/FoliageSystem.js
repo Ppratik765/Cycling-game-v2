@@ -360,14 +360,17 @@ uniform float uTime;
 `
     );
 
-    // Chroma-Key: Discards black background (from AI generated texture)
+    // Chroma-Key: Discards black background and eliminates dark fringing on edges
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <alphatest_fragment>',
       `
       #include <alphatest_fragment>
       #ifdef USE_MAP
         vec4 texelColorRaw = texture2D( map, vMapUv );
-        if (texelColorRaw.r < 0.1 && texelColorRaw.g < 0.1 && texelColorRaw.b < 0.1) discard;
+        float lum = dot(texelColorRaw.rgb, vec3(0.299, 0.587, 0.114));
+        // Stricter discard threshold to eat away the dark/black fringing around the AI texture
+        if (lum < 0.35) discard;
+        
         diffuseColor.a = 1.0;
       #endif
       `
@@ -412,7 +415,7 @@ export class FoliageSystem {
     // Shared materials
     this._grassMat = createPampasMaterial(this.uTime, this.uPlayerPos);
     this._pineLeafMat = createLeafMaterial(0xffffff, 'pine', this.uTime);    // Pure white blossoms
-    this._broadLeafMat = createLeafMaterial(0xffb7c5, 'broadleaf', this.uTime); // Light pink blossoms
+    this._broadLeafMat = createLeafMaterial(0xffffff, 'broadleaf', this.uTime); // Changed to pure white to match pines
     this._trunkMat = createTrunkMaterial();
 
     this.chunkFoliage = new Map();
