@@ -173,11 +173,7 @@ export class PlayerController {
     this._qTarget = new THREE.Quaternion();
     this._rayOrigin = new THREE.Vector3();
     this._rayDir = { x: 0.0, y: -1.0, z: 0.0 };
-    this._tempVec1 = new THREE.Vector3();
-    this._tempVec2 = new THREE.Vector3();
-    this._tempQuat1 = new THREE.Quaternion();
-    this._upVector = new THREE.Vector3(0, 1, 0);
-    this._zAxis = new THREE.Vector3(0, 0, 1);
+
     // Set camera FOV & near plane
     this.camera.fov = CAM_FOV;
     this.camera.near = CAM_NEAR;
@@ -465,7 +461,7 @@ export class PlayerController {
 
     // ── Forward / Brake / Reverse ───────────────────────────
     const vel = this.rigidBody.linvel();
-    this._forward.set(0, 0, -1).applyAxisAngle(this._upVector, this.yaw);
+    this._forward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
 
     let targetAccel = 0;
     if (this.keys.w) {
@@ -548,7 +544,7 @@ export class PlayerController {
     // ── Steering Pivot (Handlebars + Front Assembly + Gloves) ──
     // Apply steering input as relative angle around the native headset bearing column (local Z axis)!
     if (this.steeringPivot && this._baseSteerRot) {
-      const steerQuat = this._tempQuat1.setFromAxisAngle(this._zAxis, this.steerAngle);
+      const steerQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), this.steerAngle);
       this.steeringPivot.quaternion.copy(this._baseSteerRot).multiply(steerQuat);
     }
 
@@ -560,9 +556,8 @@ export class PlayerController {
     // 2. If speed < 0.1 (stationary), wheel rotation velocity MUST be 0
     if (speed >= 0.1) {
       // Direction of rotation matches forward movement; if rolling backward, invert sign
-      this._euler.set(0, this.yaw, 0);
-      const forwardDir = this._tempVec1.set(0, 0, -1).applyEuler(this._euler);
-      const velDir = this._tempVec2.set(vel.x, 0, vel.z).normalize();
+      const forwardDir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, this.yaw, 0));
+      const velDir = new THREE.Vector3(vel.x, 0, vel.z).normalize();
       const isBackward = forwardDir.dot(velDir) < -0.2;
 
       const wheelRadius = 0.33; // meters
