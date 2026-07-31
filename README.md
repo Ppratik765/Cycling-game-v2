@@ -1,51 +1,62 @@
-# Cycling Game V2 🚲🌸
+# Cycling Game V2
 
-An advanced, high-performance, infinite procedural cycling simulator built with WebGL and Three.js. Ride through an endless cherry blossom environment with GPU-accelerated wind physics, highly tuned bike controls, and a fully dynamic terrain system.
+An immersive, infinite procedural cycling simulator built with Three.js and Rapier3D. This project demonstrates high-performance web graphics, physics-based vehicle mechanics, and procedural world generation directly in the browser.
 
-## 🌟 Key Features
+## Features
 
-### 🚴‍♂️ Dynamic Bike & Rider Controller
-- **Procedural Leaning Physics:** The bike and camera procedurally tilt and lean into turns based on speed and cornering sharpness (WASD & Arrow controls).
-- **Rider Integration:** Hardcoded and rigged first-person glove models (`biker_gloves.glb`) dynamically tied to the steering column for realistic handlebar interaction.
-- **Speed-Linked Camera:** Custom procedural camera vibration and bobbing that dynamically scales with the rider's speed.
+### Procedural World Generation
+- **Infinite 3x3 Grid Chunking**: The terrain is generated dynamically in a grid around the player, ensuring memory footprint stays low while the world feels endless.
+- **Perlin Noise Elevation**: Mountains, hills, and trails are mathematically generated using procedural noise, ensuring a unique ride in every direction.
+- **Parallax Backdrop**: A custom ShaderMaterial manages an infinite, scrolling mountain ridgeline that seamlessly blends into the atmospheric fog.
 
-### 🌸 GPU-Accelerated Cherry Blossom Engine
-- **Infinite Petal Storm:** A custom `PetalParticleSystem` powering 1,500+ falling cherry blossom petals.
-- **Zero CPU Overhead:** The entire particle system runs natively on the GPU vertex shader. Petals are locked to an infinite 120-meter "wrap-around" grid, guaranteeing an endless storm without requiring expensive CPU physics updates.
-- **Luminance Chroma-Keying:** Custom-written fragment shaders process AI-generated 8K textures, dynamically discarding black backgrounds using a pristine luminance-based cutoff (`length < 0.35`) to ensure incredibly sharp, fringeless cutout leaves.
+### Advanced Foliage & Particle Systems
+- **GPU-Instanced Rendering**: Renders thousands of pampas grass blades and dense Cherry Blossom tree canopies in a single draw call utilizing `THREE.InstancedMesh`.
+- **Wind Physics Shaders**: Foliage uses custom vertex shaders (`macroPhase` and `microPhase` mathematical curves) to simulate realistic wind displacement at zero CPU cost.
+- **Dynamic Petal Particles**: Features a highly optimized Cherry Blossom petal particle system. Instead of CPU-bound lifetime updates, the petals run entirely on the GPU with an infinite wrap-around coordinate system, simulating a localized storm of thousands of drifting petals falling around the player.
+- **Custom Chroma-Keying**: Fragment shaders utilize a precise luminance threshold (`dot(color, luma) < 0.35`) to flawlessly alpha-test AI-generated leaf textures without dark fringes or harsh blending artifacts.
 
-### ⛰️ Procedural Infinite Terrain (`TerrainChunkManager`)
-- **Seamless Chunk Loading:** Uses a dynamic 3x3 rolling grid system to recycle and repurpose terrain chunks in real-time, completely eliminating memory leaks.
-- **Frustum Culling:** Foliage and terrain tiles instantly drop out of the render queue when behind the camera to preserve GPU fill-rate.
-- **Parallax Mountain Backdrops:** A `TerrainBackdrop` system simulating distant mountain ranges that moves synchronously with the player to sell the illusion of massive scale.
+### Vehicle Physics & Controller
+- **First-Person Cycling Mechanics**: Powered by the Rapier3D physics engine for realistic momentum, gravity, and tire friction.
+- **Dynamic Lean & Steer**: The bicycle leans deeply into corners (up to 26 degrees) mapping directly to the camera orientation for an intense sense of speed and balance.
+- **Speed-Driven Camera Effects**: As the bike accelerates, the camera field of view widens and introduces high-frequency vibration/shake to simulate uneven dirt trails.
+- **Skinned Mesh Rigging**: The player's virtual gloves are dynamically parented to the steering pivot, anchoring the user into the first-person perspective.
 
-### ⚡ Extreme Performance Optimizations
-- **GPU Instancing:** All grass tufts, pine trees, and broadleaf trees are rendered via `InstancedMesh`. Tens of thousands of environment props are drawn in a single draw call.
-- **Pipeline Tuning:** Stripped out heavy physics-based rendering (PBR) on environment props in favor of lightweight `MeshLambertMaterial` (trees) and `MeshBasicMaterial` (petals).
-- **Overdraw Eradication:** Petals are forced into the opaque render queue (eschewing traditional `transparent: true`), leveraging manual `discard` shader operations to bypass catastrophic GPU fill-rate bottlenecks.
+### Modern Post-Processing
+- Utilizes `postprocessing` for high-performance RenderPass pipelines.
+- Integrated Screen Space Ambient Occlusion (SSAO), Vignette, and Film Noise.
+- Custom `CustomSplatShader` for blending terrain dirt, rock, and grass textures smoothly across steep elevation gradients.
 
-## 🛠️ Tech Stack
-- **Core Engine:** [Three.js](https://threejs.org/) (WebGL)
-- **Tooling:** Vite / Node.js
-- **Assets:** Procedurally generated GLSL shaders & custom AI-generated high-res `.glb` / `.png` assets.
+## Development Setup
 
-## 🚀 Getting Started
-
-1. **Install Dependencies:**
+1. **Install Dependencies**
+   Run the following command to install required packages:
    ```bash
    npm install
    ```
 
-2. **Run Local Development Server:**
+2. **Run Local Server**
+   Start the Vite development server:
    ```bash
    npm run dev
    ```
 
-3. **Controls:**
-   - `W` / `Up Arrow`: Accelerate
+3. **Controls**
+   - `W` / `Up Arrow`: Pedal forwards (Accelerate)
    - `S` / `Down Arrow`: Brake / Reverse
-   - `A` / `Left Arrow`: Steer Left
-   - `D` / `Right Arrow`: Steer Right
+   - `A` / `Left Arrow`: Steer and lean left
+   - `D` / `Right Arrow`: Steer and lean right
+   - `Shift`: Boost/Sprint (if configured)
 
----
-*Developed with extreme focus on rendering optimization and seamless gameplay.*
+## Architecture
+
+- `main.js`: Core bootstrapping, render loop, post-processing, and physics initialization.
+- `PlayerController.js`: Maps keyboard input to Rapier3D physical forces and handles camera transforms.
+- `TerrainChunkManager.js`: Handles async loading, unloading, and positional tracking of the 3x3 procedural grid.
+- `FoliageSystem.js`: Handles `InstancedMesh` buffers for trees, trunks, and grass instances scattered across chunks.
+- `PetalParticleSystem.js`: GPU-driven particle mesh that wraps around the player dynamically.
+
+## Performance Notes
+The engine is heavily optimized to maintain a solid 60 FPS in modern browsers:
+- Device Pixel Ratio is capped at `1.5x` to prevent immense fill-rate bottlenecks on Retina/4K displays.
+- Heavy procedural foliage utilizes `MeshLambertMaterial` and `MeshBasicMaterial` over `MeshStandardMaterial` to avoid unnecessary Physics Based Rendering (PBR) overhead in the fragment shader.
+- Instanced shadow casting is restricted to essential geometry to preserve shadow-map rendering cycles.
