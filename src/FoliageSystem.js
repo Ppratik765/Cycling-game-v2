@@ -41,8 +41,8 @@ function chunkSeed(cx, cz) {
 
 /** Pampas Grass Tuft: 3 intersecting tapered blades with slight top curve */
 function createPampasTuft() {
-  const bladeW = 0.18;
-  const bladeH = 2.25;
+  const bladeW = 0.20;
+  const bladeH = 1.55;
   const segsH = 6; // Enough vertical segments for smooth bending
   const planes = [];
 
@@ -105,11 +105,11 @@ function createPineCanopy() {
     }
   };
 
-  // Stack 4 layers of decreasing size to form a pine profile
-  addLayer(13.0, 9.5, 7.0, 0);
-  addLayer(17.0, 7.5, 6.0, 0.5);
-  addLayer(21.0, 5.5, 5.0, 1.0);
-  addLayer(24.5, 3.5, 4.0, 1.5);
+  // Stack 4 layers of decreasing size to form a pine profile (widened for cherry blossom look)
+  addLayer(13.0, 10.5, 7.0, 0);
+  addLayer(17.0, 9.5, 6.0, 0.5);
+  addLayer(21.0, 8.0, 5.0, 1.0);
+  addLayer(24.5, 6.0, 4.0, 1.5);
 
   const merged = mergeGeometries(planes);
 
@@ -256,8 +256,8 @@ varying float vHeightRatio;
   // Instance world origin
   vec4 worldInst = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
 
-  // Height ratio: 0 at root, 1 at tip (blade height ~2.25)
-  vHeightRatio = clamp(position.y / 2.25, 0.0, 1.0);
+  // Height ratio: 0 at root, 1 at tip (blade height ~1.55)
+  vHeightRatio = clamp(position.y / 1.55, 0.0, 1.0);
   float heightWeight = pow(vHeightRatio, 1.6);
 
   // World position of this vertex (approximate)
@@ -317,15 +317,14 @@ varying float vHeightRatio;
 }
 
 function createLeafMaterial(baseColor, type, uTimeRef) {
-  const leafTex = new THREE.TextureLoader().load('/textures/leaf_cluster_alpha.png?v=3');
+  const leafTex = new THREE.TextureLoader().load('/textures/cherry_blossom_cluster_alpha.png');
   leafTex.colorSpace = THREE.SRGBColorSpace;
 
-  const mat = new THREE.MeshStandardMaterial({
+  // MeshLambertMaterial skips heavy PBR overhead (GGX BRDF), drastically reducing fill-rate on thousands of overlapping leaves
+  const mat = new THREE.MeshLambertMaterial({
     color: baseColor,
     map: leafTex,
     alphaTest: 0.35,
-    roughness: 0.8,
-    metalness: 0.0,
     side: THREE.DoubleSide,
   });
 
@@ -360,16 +359,17 @@ uniform float uTime;
 `
     );
 
-    // AI Chroma-Key: Discards grey/white/black backgrounds based on raw texture color
+    // Chroma-Key: Discards black background and eliminates dark fringing on edges
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <alphatest_fragment>',
       `
       #include <alphatest_fragment>
       #ifdef USE_MAP
         vec4 texelColorRaw = texture2D( map, vMapUv );
-        float maxC = max(texelColorRaw.r, max(texelColorRaw.g, texelColorRaw.b));
-        float minC = min(texelColorRaw.r, min(texelColorRaw.g, texelColorRaw.b));
-        if (maxC - minC < 0.065) discard;
+        float lum = dot(texelColorRaw.rgb, vec3(0.299, 0.587, 0.114));
+        // Stricter discard threshold to eat away the dark/black fringing around the AI texture
+        if (lum < 0.35) discard;
+        
         diffuseColor.a = 1.0;
       #endif
       `
@@ -413,8 +413,8 @@ export class FoliageSystem {
 
     // Shared materials
     this._grassMat = createPampasMaterial(this.uTime, this.uPlayerPos);
-    this._pineLeafMat = createLeafMaterial(0x3a6630, 'pine', this.uTime);    // Desaturated pine green
-    this._broadLeafMat = createLeafMaterial(0x4a7a3a, 'broadleaf', this.uTime); // Desaturated broadleaf
+    this._pineLeafMat = createLeafMaterial(0xffffff, 'pine', this.uTime);    // Pure white blossoms
+    this._broadLeafMat = createLeafMaterial(0xffffff, 'broadleaf', this.uTime); // Changed to pure white to match pines
     this._trunkMat = createTrunkMaterial();
 
     this.chunkFoliage = new Map();

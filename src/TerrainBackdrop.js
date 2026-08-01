@@ -13,7 +13,7 @@ export class TerrainBackdrop {
     scene,
     radius = 800,
     height = 400,
-    segments = 64,
+    segments = 144,
     seed = 77
   }) {
     this.scene = scene;
@@ -22,13 +22,13 @@ export class TerrainBackdrop {
     const prng = this._mulberry32(seed);
     const noise = createNoise2D(prng);
 
-    // Open-ended cylinder
+    // Open-ended cylinder with refined radial resolution for an elegant, smooth silhouette
     const geo = new THREE.CylinderGeometry(
       radius,  // radiusTop
       radius,  // radiusBottom
       height,  // height
       segments, // radialSegments
-      16,      // heightSegments — smooth mesh
+      16,      // heightSegments
       true     // openEnded
     );
 
@@ -40,24 +40,31 @@ export class TerrainBackdrop {
       const z = posAttr.getZ(i);
 
       const angle = Math.atan2(z, x);
+      // Seamless circular coordinates (u, v) ensure zero vertical seams around the 360° ring
+      const u = Math.cos(angle);
+      const v = Math.sin(angle);
       
-      // Vertical peaks
+      // Elegant Middle-Ground Peaks: Slightly smaller than original (85m max vs 115m), maintaining a clean, dignified silhouette
       const peakNoise =
-        noise(angle * 2.0, 0.0) * 80 +
-        noise(angle * 6.0, 1.0) * 35;
-        
-      // Lateral ridges (ravines and cliffs)
-      const ridgeNoise = 
-        noise(angle * 4.0, y * 0.005) * 40 + 
-        noise(angle * 14.0, y * 0.01) * 15;
+        noise(u * 2.0, v * 2.0) * 55.0 +
+        noise(u * 6.0, v * 6.0) * 22.0 +
+        noise(u * 14.0, v * 14.0) * 8.0;
 
-      // Only displace the upper parts strongly, leaving the base smooth
+      // Subtle, tasteful depth & ravines (~80m variance) so it doesn't look like a flat circular wall
+      const depthVariation = 
+        noise(u * 3.0, v * 3.0) * 50.0 + 
+        noise(u * 8.0, y * 0.005) * 22.0 + 
+        noise(u * 16.0, y * 0.01)  * 10.0;
+
+      // Only displace upper body strongly, keeping base cylinder buried smoothly below terrain
       const heightNorm = (y + height / 2) / height; 
       
-      posAttr.setY(i, y + Math.max(peakNoise, 0) * heightNorm);
+      // Allow gentle, natural valley dips down to -30m instead of clamping flat to zero (which created horizontal wall edges!)
+      const finalElevation = Math.max(-30.0, peakNoise);
+      posAttr.setY(i, y + finalElevation * heightNorm);
       
       const currentRadius = Math.sqrt(x * x + z * z);
-      const newRadius = currentRadius + ridgeNoise * heightNorm;
+      const newRadius = currentRadius + depthVariation * heightNorm;
       
       posAttr.setX(i, Math.cos(angle) * newRadius);
       posAttr.setZ(i, Math.sin(angle) * newRadius);
@@ -127,10 +134,17 @@ uniform vec3 uFogColor;
     this._fogColorUniform.value.copy(color);
   }
 
-  /** Call each frame — follows camera X, Z for parallax. */
-  update(camera) {
-    this.mesh.position.x = camera.position.x;
-    this.mesh.position.z = camera.position.z;
+  /** Call each frame — follows player/camera world X, Z for infinite horizon parallax so you never ride through mountains. */
+  update(target) {
+    if (target && (target.isCamera || target.isObject3D)) {
+      const worldPos = new THREE.Vector3();
+      target.getWorldPosition(worldPos);
+      this.mesh.position.x = worldPos.x;
+      this.mesh.position.z = worldPos.z;
+    } else if (target && target.x !== undefined && target.z !== undefined) {
+      this.mesh.position.x = target.x;
+      this.mesh.position.z = target.z;
+    }
   }
 
   _mulberry32(seed) {

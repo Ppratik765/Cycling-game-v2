@@ -9,6 +9,7 @@ import './style.css';
 // ── Three.js ────────────────────────────────────────────────
 import * as THREE from 'three';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // ── Physics ─────────────────────────────────────────────────
 import RAPIER from '@dimforge/rapier3d-compat';
@@ -31,6 +32,7 @@ import { TerrainBackdrop } from './TerrainBackdrop.js';
 import { TerrainChunkManager } from './TerrainChunkManager.js';
 import { PlayerController } from './PlayerController.js';
 import { FoliageSystem } from './FoliageSystem.js';
+import { PetalParticleSystem } from './PetalParticleSystem.js';
 import { LoadingProgress } from './LoadingProgress.js';
 
 /* ============================================================
@@ -68,6 +70,7 @@ async function init() {
 
   // ── Register all loading steps with weights ─────────────
   const stepTextures  = progress.addStep('Loading terrain textures…', 3);
+  const stepModels    = progress.addStep('Loading your ride…', 3);
   const stepSkybox    = progress.addStep('Loading skybox…', 2);
   const stepTerrain   = progress.addStep('Generating terrain…', 2);
   const stepFoliage   = progress.addStep('Planting foliage…', 1);
@@ -83,7 +86,7 @@ async function init() {
     // ── Renderer ──────────────────────────────────────────────
     const container = document.getElementById('app');
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -166,13 +169,9 @@ async function init() {
     const composer = new EffectComposer(renderer, { multisampling: 2 });
     composer.addPass(new RenderPass(scene, camera));
 
-    const ssaoEffect = new SSAOEffect(camera, scene.background, {
-      intensity: 1.5,
-      radius: 0.12,
-      luminanceInfluence: 0.6,
-    });
+    // Removed SSAOEffect because it causes intense flickering black noise/shadows on alpha-cutout grass planes!
     const vignetteEffect = new VignetteEffect({ darkness: 0.4, offset: 0.3 });
-    const effectPass = new EffectPass(camera, ssaoEffect, vignetteEffect);
+    const effectPass = new EffectPass(camera, vignetteEffect);
     composer.addPass(effectPass);
 
     // ── Splat Material ────────────────────────────────────────
@@ -187,6 +186,7 @@ async function init() {
     await LoadingProgress.yieldToUI(); // Let the browser paint before heavy sync work
 
     const foliage = new FoliageSystem(scene, noiseGen);
+    const petals = new PetalParticleSystem(scene, 1500);
 
     const chunkManager = new TerrainChunkManager({
       scene,
@@ -208,6 +208,28 @@ async function init() {
     // Foliage was already populated inside chunkManager.init() via foliage.populateChunk()
     progress.completeStep(stepFoliage);
 
+    // ── Step 4a: Load bike & glove GLTF models ───────────────
+    progress.startStep(stepModels);
+    const gltfLoader = new GLTFLoader();
+
+    function loadGLTF(path) {
+      return new Promise((resolve, reject) => {
+        gltfLoader.load(
+          path,
+          (gltf) => resolve(gltf),
+          undefined,
+          (err) => reject(new Error(`Failed to load GLTF: ${path}`))
+        );
+      });
+    }
+
+    const [bikeGLTF, glovesGLTF] = await Promise.all([
+      loadGLTF('/carbon_frame_bike.glb'),
+      loadGLTF('/biker_gloves.glb'),
+    ]);
+    console.log('✅ Your ride loaded');
+    progress.completeStep(stepModels);
+
     // ── Player Controller ─────────────────────────────────────
     // Spawn ON the trail curve so terrain is guaranteed to be there
     const spawnZ = 0;
@@ -219,6 +241,8 @@ async function init() {
       scene,
       camera,
       spawnPos: new THREE.Vector3(spawnX, spawnY, spawnZ),
+      bikeModel: bikeGLTF.scene,
+      glovesModel: glovesGLTF.scene,
     });
 
     // Pre-step physics so the player settles onto terrain before rendering
@@ -285,9 +309,10 @@ async function init() {
       // 3.5 Update foliage wind animation + player interaction
       elapsed += delta;
       foliage.update(elapsed, playerPos);
+      petals.update(elapsed, playerPos);
 
-      // 4. Update backdrop parallax
-      backdrop.update(camera);
+      // 4. Update backdrop parallax (sync with player world position for infinite terrain illusion)
+      backdrop.update(playerPos);
 
       // 5. Follow sun light to player
       sunLight.position.set(
