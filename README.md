@@ -22,9 +22,9 @@ An immersive, infinite procedural cycling simulator built with Three.js and Rapi
 - **Skinned Mesh Rigging**: The player's virtual gloves are dynamically parented to the steering pivot, anchoring the user into the first-person perspective.
 
 ### Mobile Support
-- **Analogue Virtual Joystick**: Integrated `nipplejs` for seamless, dynamic multi-touch mobile controls.
-- **Dynamic Joystick Placement**: Touching anywhere on the lower half of the screen dynamically spawns the joystick.
-- **Fluid Handling**: Joystick provides analogue vectors (e.g., 0.5 steering vs 1.0 binary keyboard input) for ultra-smooth leaning and acceleration directly mapped to the physics engine.
+- **Racing-Style Touch Pedals**: Translucent throttle (green) and brake (red) pedals with textured grip lines are overlaid at the bottom-right of the screen on touch devices.
+- **Gyroscope Tilt Steering**: Device orientation sensors map the physical tilt of the phone directly to the bike's lean and steering angle with dead-zone calibration for natural handling.
+- **iOS Permission Handling**: On iOS 13+, gyroscope access is requested on the first pedal touch via `DeviceOrientationEvent.requestPermission()`.
 
 ### Modern Post-Processing
 - Utilizes `postprocessing` for high-performance RenderPass pipelines.
@@ -52,14 +52,14 @@ An immersive, infinite procedural cycling simulator built with Three.js and Rapi
      - `A` / `Left Arrow`: Steer and lean left
      - `D` / `Right Arrow`: Steer and lean right
    - **Mobile / Touch**:
-     - Touch and drag anywhere on the bottom half of the screen.
-     - **Up/Down**: Accelerate / Brake
-     - **Left/Right**: Steer / Lean
+     - **Throttle Pedal** (bottom-right, green): Hold to accelerate.
+     - **Brake Pedal** (bottom-right, red): Hold to brake / reverse.
+     - **Tilt Phone**: Tilt your device left or right to steer and lean the bike.
 
 ## Architecture
 
 - `main.js`: Core bootstrapping, render loop, post-processing, physics initialization, and mobile detection.
-- `PlayerController.js`: Maps keyboard and virtual joystick (`nipplejs`) input to Rapier3D physical forces and handles camera transforms.
+- `PlayerController.js`: Maps keyboard input and mobile touch/gyroscope input to Rapier3D physical forces and handles camera transforms.
 - `TerrainChunkManager.js`: Handles async loading, unloading, and positional tracking of the 3x3 procedural grid.
 - `FoliageSystem.js`: Handles `InstancedMesh` buffers for trees, trunks, and grass instances scattered across chunks.
 - `PetalParticleSystem.js`: GPU-driven particle mesh that wraps around the player dynamically.
