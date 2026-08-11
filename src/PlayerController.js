@@ -749,18 +749,47 @@ export class PlayerController {
     };
 
     const handleOrientation = (e) => {
-      if (e.gamma === null) return;
+      if (e.gamma === null || e.beta === null) return;
+      
+      // Determine device orientation (Portrait vs Landscape)
+      let currentAngle = 0;
+      if (screen && screen.orientation && screen.orientation.angle !== undefined) {
+        currentAngle = screen.orientation.angle;
+      } else if (typeof window.orientation !== 'undefined') {
+        currentAngle = window.orientation;
+      }
+
+      // In portrait mode, left/right steering is gamma. In landscape, it's beta.
+      let tiltValue = 0;
+      if (currentAngle === 90) {
+        tiltValue = e.beta;
+      } else if (currentAngle === -90 || currentAngle === 270) {
+        tiltValue = -e.beta;
+      } else {
+        // Portrait (0 or 180)
+        tiltValue = e.gamma;
+      }
+
       // Calibrate on first reading so user's natural holding angle becomes "center"
-      if (gyroCalibration === null) gyroCalibration = e.gamma;
-      const raw = e.gamma - gyroCalibration;
+      if (gyroCalibration === null) gyroCalibration = tiltValue;
+      
+      const raw = tiltValue - gyroCalibration;
       const absRaw = Math.abs(raw);
+      
       if (absRaw < TILT_DEAD_ZONE) {
         this.mobile.tilt = 0;
       } else {
         const sign = raw > 0 ? 1 : -1;
-        this.mobile.tilt = sign * Math.min((absRaw - TILT_DEAD_ZONE) / (TILT_MAX - TILT_DEAD_ZONE), 1.0);
+        const normalized = Math.min((absRaw - TILT_DEAD_ZONE) / (TILT_MAX - TILT_DEAD_ZONE), 1.0);
+        // Apply a quadratic curve (x^2) for smoother, less twitchy steering near the center
+        this.mobile.tilt = sign * (normalized * normalized);
       }
     };
+
+    // Recalibrate when the user rotates their phone
+    window.addEventListener('orientationchange', () => {
+      if (window.calibrateGyro) window.calibrateGyro();
+    });
 
     // iOS 13+ requires explicit permission request
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
