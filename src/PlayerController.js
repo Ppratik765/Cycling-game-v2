@@ -26,7 +26,6 @@ const STEER_SPEED = 5.0;    // lerp speed for handlebar rotation
 const CAM_HEIGHT = 1.65;   // Y offset (GoPro head/helmet mount height for seated rider)
 const CAM_SMOOTH_POS = 6.0;    // position spring stiffness
 const CAM_SMOOTH_ROT = 8.0;    // rotation spring stiffness
-const CAM_FOV = 90;     // GoPro-style wide FOV
 const CAM_NEAR = 0.05;   // Near plane — prevent clipping gloves/bars
 
 const CAPSULE_HALF_H = 0.4;
@@ -176,8 +175,7 @@ export class PlayerController {
     this._rayOrigin = new THREE.Vector3();
     this._rayDir = { x: 0.0, y: -1.0, z: 0.0 };
 
-    // Set camera FOV & near plane
-    this.camera.fov = CAM_FOV;
+    // Set camera near plane
     this.camera.near = CAM_NEAR;
     this.camera.updateProjectionMatrix();
   }
@@ -608,8 +606,13 @@ export class PlayerController {
     // Base helmet GoPro pitch (tilted -15° downward toward handlebars and front wheel)
     const basePitch = -0.26; // ~15° downward tilt to cleanly frame spinning front wheel!
 
+    // In portrait mode, the screen is narrow. Pull the camera back and slightly up to prevent handlebars getting cut off.
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const zOffset = isPortrait ? 0.35 : 0.0;
+    const yOffset = isPortrait ? 0.10 : 0.0;
+
     // Camera is parented to leanPivot; set local position + rotation
-    this.camera.position.set(0, CAM_HEIGHT, 0);
+    this.camera.position.set(0, CAM_HEIGHT + yOffset, zOffset);
     this.camera.rotation.set(
       basePitch + vibX + shakeX,
       0,
