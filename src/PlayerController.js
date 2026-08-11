@@ -493,7 +493,8 @@ export class PlayerController {
 
     this.currentSpeed += targetAccel * delta;
 
-    if (this.keys.s && this.currentSpeed <= 0) {
+    const isReversing = this.keys.s || this.joystick.y < -0.05;
+    if (isReversing && this.currentSpeed <= 0) {
       this.currentSpeed = Math.max(this.currentSpeed, -REVERSE_MAX_SPEED);
     } else {
       this.currentSpeed = Math.min(Math.max(this.currentSpeed, 0), MAX_SPEED);
@@ -606,10 +607,10 @@ export class PlayerController {
     // Base helmet GoPro pitch (tilted -15° downward toward handlebars and front wheel)
     const basePitch = -0.26; // ~15° downward tilt to cleanly frame spinning front wheel!
 
-    // In portrait mode, the screen is narrow. Pull the camera back and slightly up to prevent handlebars getting cut off.
+    // In portrait mode, the screen is narrow. Pull the camera back slightly to prevent handlebars getting cut off.
     const isPortrait = window.innerHeight > window.innerWidth;
-    const zOffset = isPortrait ? 0.35 : 0.0;
-    const yOffset = isPortrait ? 0.10 : 0.0;
+    const zOffset = isPortrait ? 0.12 : 0.0;
+    const yOffset = isPortrait ? 0.04 : 0.0;
 
     // Camera is parented to leanPivot; set local position + rotation
     this.camera.position.set(0, CAM_HEIGHT + yOffset, zOffset);
@@ -645,40 +646,42 @@ export class PlayerController {
     const isMobile = window.matchMedia('(pointer: coarse)').matches || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     if (isMobile) {
-      // Inject CSS to make joystick base transparent and nub translucent
+      // Inject CSS: base circle = translucent, nub circle = opaque
       const style = document.createElement('style');
       style.innerHTML = `
-        .nipple .back { opacity: 0 !important; }
-        .nipple .front { opacity: 0.3 !important; }
+        .nipple .back { opacity: 0.15 !important; }
+        .nipple .front { opacity: 0.85 !important; }
       `;
       document.head.appendChild(style);
 
       const zone = document.createElement('div');
-      zone.style.position = 'absolute';
-      zone.style.width = '100%';
-      zone.style.height = '100%';
-      zone.style.bottom = '0';
+      zone.id = 'joystick-zone';
+      zone.style.position = 'fixed';
+      zone.style.top = '0';
       zone.style.left = '0';
+      zone.style.width = '100vw';
+      zone.style.height = '100vh';
       zone.style.zIndex = '999';
-      zone.style.touchAction = 'none'; // Prevent browser scrolling
+      zone.style.touchAction = 'none';
       document.body.appendChild(zone);
 
       const manager = nipplejs.create({
         zone: zone,
         mode: 'dynamic',
         color: 'white',
-        size: 150
+        size: 120,
+        restOpacity: 0.3,
       });
 
+      console.log('[Mobile] Virtual joystick initialized');
+
       manager.on('move', (evt, data) => {
-        if (!data || !data.force || !data.angle) return;
-        // force goes from 0 to ~1 (cap at 1.0)
-        const force = Math.min(data.force, 1.0);
-        // angle.radian is standard math: 0=Right, PI/2=Up, PI=Left, -PI/2=Down
-        this.joystick.x = Math.cos(data.angle.radian) * force;
-        this.joystick.y = Math.sin(data.angle.radian) * force;
+        if (!data || !data.vector) return;
+        // data.vector.x = -1..1 (left to right), data.vector.y = -1..1 (down to up)
+        this.joystick.x = data.vector.x;
+        this.joystick.y = data.vector.y;
       });
-      
+
       manager.on('end', () => {
         this.joystick.x = 0;
         this.joystick.y = 0;
