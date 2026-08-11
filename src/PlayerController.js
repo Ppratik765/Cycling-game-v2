@@ -436,22 +436,25 @@ export class PlayerController {
     if (this.keys.a) targetLean = maxLean;
     if (this.keys.d) targetLean = -maxLean;
     // Mobile gyroscope tilt overrides keyboard when active
-    const isMobileSteering = Math.abs(this.mobile.tilt) > 0.05;
-    if (isMobileSteering) targetLean = -this.mobile.tilt * maxLean;
+    if (Math.abs(this.mobile.tilt) > 0.05) targetLean = -this.mobile.tilt * maxLean;
 
-    this.currentLean = isMobileSteering 
-      ? targetLean 
-      : THREE.MathUtils.lerp(this.currentLean, targetLean, 1.0 - Math.exp(-LEAN_SPEED * delta));
+    this.currentLean = THREE.MathUtils.lerp(
+      this.currentLean, 
+      targetLean, 
+      1.0 - Math.exp(-LEAN_SPEED * delta)
+    );
 
     // ── Steering angle ──────────────────────────────────────
     let targetSteer = 0;
     if (this.keys.a) targetSteer = STEER_MAX_RAD;
     if (this.keys.d) targetSteer = -STEER_MAX_RAD;
-    if (isMobileSteering) targetSteer = -this.mobile.tilt * STEER_MAX_RAD;
+    if (Math.abs(this.mobile.tilt) > 0.05) targetSteer = -this.mobile.tilt * STEER_MAX_RAD;
 
-    this.steerAngle = isMobileSteering 
-      ? targetSteer 
-      : THREE.MathUtils.lerp(this.steerAngle, targetSteer, 1.0 - Math.exp(-STEER_SPEED * delta));
+    this.steerAngle = THREE.MathUtils.lerp(
+      this.steerAngle, 
+      targetSteer, 
+      1.0 - Math.exp(-STEER_SPEED * delta)
+    );
 
     // ── Yaw (turning) ───────────────────────────────────────
     const leanNorm = maxLean > 0 ? (this.currentLean / maxLean) : 0;
@@ -693,7 +696,7 @@ export class PlayerController {
       }
       .pedal-throttle {
         width: 48px;
-        height: 140px;
+        height: 100px;
         background: rgba(80, 200, 120, 0.08);
       }
       .pedal-throttle.active {
@@ -734,9 +737,9 @@ export class PlayerController {
 
     // ── 3. Gyroscope tilt steering ──────────────────────────
     // gamma = left/right tilt in degrees (-90 to 90)
-    // We map ~15 degrees of tilt to full steering
+    // We map ~35 degrees of tilt to full steering lock
     const TILT_DEAD_ZONE = 3;  // degrees
-    const TILT_MAX = 18;       // degrees for full lock
+    const TILT_MAX = 35;       // degrees for full lock
     let gyroCalibration = null;
 
     // Expose a calibration function so the game can re-center when the level fully loads
