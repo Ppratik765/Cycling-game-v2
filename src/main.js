@@ -199,7 +199,7 @@ async function init() {
       noiseGen,
       material: terrainMaterial,
       foliage,
-      chunkSize: 200,
+      chunkSize: 150,
     });
 
     // Force initial 3x3 chunk generation asynchronously to keep UI responsive
