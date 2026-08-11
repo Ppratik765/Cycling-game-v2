@@ -6,7 +6,6 @@
  * ============================================================ */
 
 import * as THREE from 'three';
-import nipplejs from 'nipplejs';
 
 // ── Tuning Constants ────────────────────────────────────────
 
@@ -127,7 +126,7 @@ export class PlayerController {
 
     // ── Input state ─────────────────────────────────────────
     this.keys = { w: false, s: false, a: false, d: false };
-    this.joystick = { x: 0, y: 0 };
+    this.mobile = { throttle: 0, brake: 0, tilt: 0 }; // throttle/brake 0..1, tilt -1..1
     this._bindInput();
 
     // ── Player heading & lean ───────────────────────────────
@@ -436,7 +435,8 @@ export class PlayerController {
     let targetLean = 0;
     if (this.keys.a) targetLean = maxLean;
     if (this.keys.d) targetLean = -maxLean;
-    if (Math.abs(this.joystick.x) > 0.05) targetLean = -this.joystick.x * maxLean; // Analogue lean
+    // Mobile gyroscope tilt overrides keyboard when active
+    if (Math.abs(this.mobile.tilt) > 0.05) targetLean = -this.mobile.tilt * maxLean;
 
     this.currentLean = THREE.MathUtils.lerp(
       this.currentLean,
@@ -448,7 +448,7 @@ export class PlayerController {
     let targetSteer = 0;
     if (this.keys.a) targetSteer = STEER_MAX_RAD;
     if (this.keys.d) targetSteer = -STEER_MAX_RAD;
-    if (Math.abs(this.joystick.x) > 0.05) targetSteer = -this.joystick.x * STEER_MAX_RAD; // Analogue steer
+    if (Math.abs(this.mobile.tilt) > 0.05) targetSteer = -this.mobile.tilt * STEER_MAX_RAD;
 
     this.steerAngle = THREE.MathUtils.lerp(
       this.steerAngle,
@@ -469,9 +469,9 @@ export class PlayerController {
     let forwardAmount = this.keys.w ? 1 : 0;
     let backwardAmount = this.keys.s ? 1 : 0;
 
-    // Analogue joystick throttle
-    if (this.joystick.y > 0.05) forwardAmount = Math.max(forwardAmount, this.joystick.y);
-    if (this.joystick.y < -0.05) backwardAmount = Math.max(backwardAmount, -this.joystick.y);
+    // Mobile pedal input
+    if (this.mobile.throttle > 0.01) forwardAmount = Math.max(forwardAmount, this.mobile.throttle);
+    if (this.mobile.brake > 0.01) backwardAmount = Math.max(backwardAmount, this.mobile.brake);
 
     if (forwardAmount > 0) {
       const speedRatio = Math.max(0, this.currentSpeed) / MAX_SPEED;
@@ -493,7 +493,7 @@ export class PlayerController {
 
     this.currentSpeed += targetAccel * delta;
 
-    const isReversing = this.keys.s || this.joystick.y < -0.05;
+    const isReversing = this.keys.s || this.mobile.brake > 0.01;
     if (isReversing && this.currentSpeed <= 0) {
       this.currentSpeed = Math.max(this.currentSpeed, -REVERSE_MAX_SPEED);
     } else {
@@ -627,65 +627,163 @@ export class PlayerController {
   _bindInput() {
     const handler = (e, pressed) => {
       let key = e.key.toLowerCase();
-
       if (key === 'arrowup') key = 'w';
       if (key === 'arrowdown') key = 's';
       if (key === 'arrowleft') key = 'a';
       if (key === 'arrowright') key = 'd';
-
       if (key in this.keys) {
         this.keys[key] = pressed;
         e.preventDefault();
       }
     };
-
     window.addEventListener('keydown', (e) => handler(e, true));
     window.addEventListener('keyup', (e) => handler(e, false));
 
-    // Mobile Virtual Joystick Overlay
+    // ── Mobile: Racing-style pedals + gyroscope tilt ────────
     const isMobile = window.matchMedia('(pointer: coarse)').matches || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-      // Inject CSS: base circle = translucent, nub circle = opaque
-      const style = document.createElement('style');
-      style.innerHTML = `
-        .nipple .back { opacity: 0.15 !important; }
-        .nipple .front { opacity: 0.85 !important; }
-      `;
-      document.head.appendChild(style);
+    if (!isMobile) return;
 
-      const zone = document.createElement('div');
-      zone.id = 'joystick-zone';
-      zone.style.position = 'fixed';
-      zone.style.top = '0';
-      zone.style.left = '0';
-      zone.style.width = '100vw';
-      zone.style.height = '100vh';
-      zone.style.zIndex = '999';
-      zone.style.touchAction = 'none';
-      document.body.appendChild(zone);
+    console.log('[Mobile] Initializing racing pedals + gyro tilt');
 
-      const manager = nipplejs.create({
-        zone: zone,
-        mode: 'dynamic',
-        color: 'white',
-        size: 120,
-        restOpacity: 0.3,
-      });
+    // ── 1. Inject pedal UI ──────────────────────────────────
+    const pedalCSS = document.createElement('style');
+    pedalCSS.innerHTML = `
+      .pedal-container {
+        position: fixed;
+        bottom: 24px;
+        right: 16px;
+        display: flex;
+        gap: 14px;
+        z-index: 1000;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .pedal {
+        width: 72px;
+        height: 120px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.85);
+        border: 2px solid rgba(255,255,255,0.25);
+        position: relative;
+        overflow: hidden;
+        transition: border-color 0.1s;
+      }
+      .pedal::before {
+        content: '';
+        position: absolute;
+        top: 8px; bottom: 8px; left: 12px; right: 12px;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(255,255,255,0.08) 0px,
+          rgba(255,255,255,0.08) 2px,
+          transparent 2px,
+          transparent 7px
+        );
+        border-radius: 6px;
+        pointer-events: none;
+      }
+      .pedal-throttle {
+        background: rgba(80, 200, 120, 0.18);
+      }
+      .pedal-throttle.active {
+        background: rgba(80, 200, 120, 0.45);
+        border-color: rgba(80, 200, 120, 0.7);
+      }
+      .pedal-brake {
+        background: rgba(220, 80, 80, 0.18);
+      }
+      .pedal-brake.active {
+        background: rgba(220, 80, 80, 0.45);
+        border-color: rgba(220, 80, 80, 0.7);
+      }
+      .pedal-icon {
+        font-size: 24px;
+        margin-bottom: 4px;
+        opacity: 0.7;
+        pointer-events: none;
+      }
+      .pedal-label {
+        pointer-events: none;
+      }
+    `;
+    document.head.appendChild(pedalCSS);
 
-      console.log('[Mobile] Virtual joystick initialized');
+    const container = document.createElement('div');
+    container.className = 'pedal-container';
 
-      manager.on('move', (evt, data) => {
-        if (!data || !data.vector) return;
-        // data.vector.x = -1..1 (left to right), data.vector.y = -1..1 (down to up)
-        this.joystick.x = data.vector.x;
-        this.joystick.y = data.vector.y;
-      });
+    const brakeBtn = document.createElement('div');
+    brakeBtn.className = 'pedal pedal-brake';
+    brakeBtn.innerHTML = '<span class="pedal-icon">\u25A0</span><span class="pedal-label">Brake</span>';
 
-      manager.on('end', () => {
-        this.joystick.x = 0;
-        this.joystick.y = 0;
-      });
+    const throttleBtn = document.createElement('div');
+    throttleBtn.className = 'pedal pedal-throttle';
+    throttleBtn.innerHTML = '<span class="pedal-icon">\u25B6</span><span class="pedal-label">Gas</span>';
+
+    container.appendChild(brakeBtn);
+    container.appendChild(throttleBtn);
+    document.body.appendChild(container);
+
+    // ── 2. Pedal touch handlers ─────────────────────────────
+    const bindPedal = (el, prop) => {
+      const onDown = (e) => { e.preventDefault(); this.mobile[prop] = 1; el.classList.add('active'); };
+      const onUp = (e) => { e.preventDefault(); this.mobile[prop] = 0; el.classList.remove('active'); };
+      el.addEventListener('touchstart', onDown, { passive: false });
+      el.addEventListener('touchend', onUp, { passive: false });
+      el.addEventListener('touchcancel', onUp, { passive: false });
+    };
+    bindPedal(throttleBtn, 'throttle');
+    bindPedal(brakeBtn, 'brake');
+
+    // ── 3. Gyroscope tilt steering ──────────────────────────
+    // gamma = left/right tilt in degrees (-90 to 90)
+    // We map ~15 degrees of tilt to full steering
+    const TILT_DEAD_ZONE = 3;  // degrees
+    const TILT_MAX = 18;       // degrees for full lock
+    let gyroCalibration = null;
+
+    const handleOrientation = (e) => {
+      if (e.gamma === null) return;
+      // Calibrate on first reading so user's natural holding angle becomes "center"
+      if (gyroCalibration === null) gyroCalibration = e.gamma;
+      const raw = e.gamma - gyroCalibration;
+      const absRaw = Math.abs(raw);
+      if (absRaw < TILT_DEAD_ZONE) {
+        this.mobile.tilt = 0;
+      } else {
+        const sign = raw > 0 ? 1 : -1;
+        this.mobile.tilt = sign * Math.min((absRaw - TILT_DEAD_ZONE) / (TILT_MAX - TILT_DEAD_ZONE), 1.0);
+      }
+    };
+
+    // iOS 13+ requires explicit permission request
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      // We need a user gesture to request permission. Attach to the first pedal touch.
+      const requestGyro = () => {
+        DeviceOrientationEvent.requestPermission().then(state => {
+          if (state === 'granted') {
+            window.addEventListener('deviceorientation', handleOrientation);
+            console.log('[Mobile] Gyroscope permission granted');
+          }
+        }).catch(console.error);
+        // Only request once
+        throttleBtn.removeEventListener('touchstart', requestGyro);
+        brakeBtn.removeEventListener('touchstart', requestGyro);
+      };
+      throttleBtn.addEventListener('touchstart', requestGyro);
+      brakeBtn.addEventListener('touchstart', requestGyro);
+    } else {
+      // Android and older browsers: just listen
+      window.addEventListener('deviceorientation', handleOrientation);
     }
   }
 }
