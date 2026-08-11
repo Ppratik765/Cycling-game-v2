@@ -608,8 +608,8 @@ export class PlayerController {
 
     // In portrait mode, the screen is narrow. Pull the camera back and slightly up to prevent handlebars getting cut off.
     const isPortrait = window.innerHeight > window.innerWidth;
-    const zOffset = isPortrait ? 0.35 : 0.0;
-    const yOffset = isPortrait ? 0.10 : 0.0;
+    const zOffset = isPortrait ? 0.15 : 0.0;
+    const yOffset = isPortrait ? 0.05 : 0.0;
 
     // Camera is parented to leanPivot; set local position + rotation
     this.camera.position.set(0, CAM_HEIGHT + yOffset, zOffset);
