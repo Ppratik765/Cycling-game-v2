@@ -335,6 +335,7 @@ async function init() {
     progress.showReady();
     await new Promise(r => setTimeout(r, 400)); // Brief pause on "Ready!" so the user sees it
     progress.hideOverlay();
+    if (window.calibrateGyro) window.calibrateGyro();
     animate();
 
     console.log(

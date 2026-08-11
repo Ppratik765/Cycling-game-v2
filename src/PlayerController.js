@@ -436,25 +436,22 @@ export class PlayerController {
     if (this.keys.a) targetLean = maxLean;
     if (this.keys.d) targetLean = -maxLean;
     // Mobile gyroscope tilt overrides keyboard when active
-    if (Math.abs(this.mobile.tilt) > 0.05) targetLean = -this.mobile.tilt * maxLean;
+    const isMobileSteering = Math.abs(this.mobile.tilt) > 0.05;
+    if (isMobileSteering) targetLean = -this.mobile.tilt * maxLean;
 
-    this.currentLean = THREE.MathUtils.lerp(
-      this.currentLean,
-      targetLean,
-      1.0 - Math.exp(-LEAN_SPEED * delta)
-    );
+    this.currentLean = isMobileSteering 
+      ? targetLean 
+      : THREE.MathUtils.lerp(this.currentLean, targetLean, 1.0 - Math.exp(-LEAN_SPEED * delta));
 
     // ── Steering angle ──────────────────────────────────────
     let targetSteer = 0;
     if (this.keys.a) targetSteer = STEER_MAX_RAD;
     if (this.keys.d) targetSteer = -STEER_MAX_RAD;
-    if (Math.abs(this.mobile.tilt) > 0.05) targetSteer = -this.mobile.tilt * STEER_MAX_RAD;
+    if (isMobileSteering) targetSteer = -this.mobile.tilt * STEER_MAX_RAD;
 
-    this.steerAngle = THREE.MathUtils.lerp(
-      this.steerAngle,
-      targetSteer,
-      1.0 - Math.exp(-STEER_SPEED * delta)
-    );
+    this.steerAngle = isMobileSteering 
+      ? targetSteer 
+      : THREE.MathUtils.lerp(this.steerAngle, targetSteer, 1.0 - Math.exp(-STEER_SPEED * delta));
 
     // ── Yaw (turning) ───────────────────────────────────────
     const leanNorm = maxLean > 0 ? (this.currentLean / maxLean) : 0;
@@ -651,68 +648,61 @@ export class PlayerController {
       .pedal-container {
         position: fixed;
         bottom: 24px;
-        right: 16px;
+        right: 24px;
         display: flex;
-        gap: 14px;
+        align-items: flex-end;
+        gap: 16px;
         z-index: 1000;
         touch-action: none;
         user-select: none;
         -webkit-user-select: none;
       }
       .pedal {
-        width: 72px;
-        height: 120px;
-        border-radius: 14px;
+        border-radius: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
-        flex-direction: column;
-        font-family: 'Inter', 'Segoe UI', sans-serif;
-        font-weight: 700;
-        font-size: 11px;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        color: rgba(255,255,255,0.85);
-        border: 2px solid rgba(255,255,255,0.25);
+        color: rgba(255,255,255,0.7);
+        border: 2px solid rgba(255,255,255,0.15);
         position: relative;
         overflow: hidden;
-        transition: border-color 0.1s;
+        transition: border-color 0.1s, background 0.1s;
       }
       .pedal::before {
         content: '';
         position: absolute;
-        top: 8px; bottom: 8px; left: 12px; right: 12px;
+        top: 6px; bottom: 6px; left: 8px; right: 8px;
         background: repeating-linear-gradient(
           0deg,
-          rgba(255,255,255,0.08) 0px,
-          rgba(255,255,255,0.08) 2px,
+          rgba(255,255,255,0.06) 0px,
+          rgba(255,255,255,0.06) 2px,
           transparent 2px,
-          transparent 7px
+          transparent 8px
         );
         border-radius: 6px;
         pointer-events: none;
       }
-      .pedal-throttle {
-        background: rgba(80, 200, 120, 0.18);
-      }
-      .pedal-throttle.active {
-        background: rgba(80, 200, 120, 0.45);
-        border-color: rgba(80, 200, 120, 0.7);
-      }
       .pedal-brake {
-        background: rgba(220, 80, 80, 0.18);
+        width: 80px;
+        height: 64px;
+        background: rgba(220, 80, 80, 0.08);
       }
       .pedal-brake.active {
-        background: rgba(220, 80, 80, 0.45);
-        border-color: rgba(220, 80, 80, 0.7);
+        background: rgba(220, 80, 80, 0.3);
+        border-color: rgba(220, 80, 80, 0.6);
+      }
+      .pedal-throttle {
+        width: 48px;
+        height: 140px;
+        background: rgba(80, 200, 120, 0.08);
+      }
+      .pedal-throttle.active {
+        background: rgba(80, 200, 120, 0.3);
+        border-color: rgba(80, 200, 120, 0.6);
       }
       .pedal-icon {
-        font-size: 24px;
-        margin-bottom: 4px;
-        opacity: 0.7;
-        pointer-events: none;
-      }
-      .pedal-label {
+        font-size: 20px;
+        opacity: 0.8;
         pointer-events: none;
       }
     `;
@@ -723,11 +713,9 @@ export class PlayerController {
 
     const brakeBtn = document.createElement('div');
     brakeBtn.className = 'pedal pedal-brake';
-    brakeBtn.innerHTML = '<span class="pedal-icon">\u25A0</span><span class="pedal-label">Brake</span>';
 
     const throttleBtn = document.createElement('div');
     throttleBtn.className = 'pedal pedal-throttle';
-    throttleBtn.innerHTML = '<span class="pedal-icon">\u25B6</span><span class="pedal-label">Gas</span>';
 
     container.appendChild(brakeBtn);
     container.appendChild(throttleBtn);
@@ -750,6 +738,12 @@ export class PlayerController {
     const TILT_DEAD_ZONE = 3;  // degrees
     const TILT_MAX = 18;       // degrees for full lock
     let gyroCalibration = null;
+
+    // Expose a calibration function so the game can re-center when the level fully loads
+    window.calibrateGyro = () => {
+      gyroCalibration = null;
+      console.log('[Mobile] Gyroscope recalibrated to current holding angle');
+    };
 
     const handleOrientation = (e) => {
       if (e.gamma === null) return;
