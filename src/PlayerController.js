@@ -608,8 +608,8 @@ export class PlayerController {
 
     // In portrait mode, the screen is narrow. Pull the camera back and slightly up to prevent handlebars getting cut off.
     const isPortrait = window.innerHeight > window.innerWidth;
-    const zOffset = isPortrait ? 0.15 : 0.0;
-    const yOffset = isPortrait ? 0.05 : 0.0;
+    const zOffset = isPortrait ? 0.35 : 0.0;
+    const yOffset = isPortrait ? 0.10 : 0.0;
 
     // Camera is parented to leanPivot; set local position + rotation
     this.camera.position.set(0, CAM_HEIGHT + yOffset, zOffset);
@@ -645,10 +645,11 @@ export class PlayerController {
     const isMobile = window.matchMedia('(pointer: coarse)').matches || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     if (isMobile) {
+      // Inject CSS to make joystick base transparent and nub translucent
       const style = document.createElement('style');
       style.innerHTML = `
-        .nipple .back { opacity: 0.3 !important; }
-        .nipple .front { opacity: 1.0 !important; }
+        .nipple .back { opacity: 0 !important; }
+        .nipple .front { opacity: 0.3 !important; }
       `;
       document.head.appendChild(style);
 
@@ -670,10 +671,12 @@ export class PlayerController {
       });
 
       manager.on('move', (evt, data) => {
-        if (data && data.vector) {
-          this.joystick.x = data.vector.x; // Right is positive, Left is negative
-          this.joystick.y = -data.vector.y; // In browser coords, UP is negative Y, so we invert it so UP is positive Y for the throttle!
-        }
+        if (!data || !data.force || !data.angle) return;
+        // force goes from 0 to ~1 (cap at 1.0)
+        const force = Math.min(data.force, 1.0);
+        // angle.radian is standard math: 0=Right, PI/2=Up, PI=Left, -PI/2=Down
+        this.joystick.x = Math.cos(data.angle.radian) * force;
+        this.joystick.y = Math.sin(data.angle.radian) * force;
       });
       
       manager.on('end', () => {
