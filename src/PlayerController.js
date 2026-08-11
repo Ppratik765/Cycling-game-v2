@@ -642,6 +642,14 @@ export class PlayerController {
     const isMobile = window.matchMedia('(pointer: coarse)').matches || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     if (isMobile) {
+      // Inject CSS to make joystick base transparent and nub translucent
+      const style = document.createElement('style');
+      style.innerHTML = `
+        .nipple .back { opacity: 0 !important; }
+        .nipple .front { opacity: 0.3 !important; }
+      `;
+      document.head.appendChild(style);
+
       const zone = document.createElement('div');
       zone.style.position = 'absolute';
       zone.style.width = '100%';
@@ -660,9 +668,12 @@ export class PlayerController {
       });
 
       manager.on('move', (evt, data) => {
-        if (!data || !data.vector) return;
-        this.joystick.x = data.vector.x; // -1 to 1 (left to right)
-        this.joystick.y = data.vector.y; // -1 to 1 (down to up)
+        if (!data || !data.force || !data.angle) return;
+        // force goes from 0 to ~1 (cap at 1.0)
+        const force = Math.min(data.force, 1.0);
+        // angle.radian is standard math: 0=Right, PI/2=Up, PI=Left, -PI/2=Down
+        this.joystick.x = Math.cos(data.angle.radian) * force;
+        this.joystick.y = Math.sin(data.angle.radian) * force;
       });
       
       manager.on('end', () => {
