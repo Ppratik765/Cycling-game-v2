@@ -6,6 +6,7 @@
  * ============================================================ */
 
 import * as THREE from 'three';
+import nipplejs from 'nipplejs';
 
 // ── Tuning Constants ────────────────────────────────────────
 
@@ -127,6 +128,7 @@ export class PlayerController {
 
     // ── Input state ─────────────────────────────────────────
     this.keys = { w: false, s: false, a: false, d: false };
+    this.joystick = { x: 0, y: 0 };
     this._bindInput();
 
     // ── Player heading & lean ───────────────────────────────
@@ -436,6 +438,7 @@ export class PlayerController {
     let targetLean = 0;
     if (this.keys.a) targetLean = maxLean;
     if (this.keys.d) targetLean = -maxLean;
+    if (Math.abs(this.joystick.x) > 0.05) targetLean = -this.joystick.x * maxLean; // Analogue lean
 
     this.currentLean = THREE.MathUtils.lerp(
       this.currentLean,
@@ -447,6 +450,7 @@ export class PlayerController {
     let targetSteer = 0;
     if (this.keys.a) targetSteer = STEER_MAX_RAD;
     if (this.keys.d) targetSteer = -STEER_MAX_RAD;
+    if (Math.abs(this.joystick.x) > 0.05) targetSteer = -this.joystick.x * STEER_MAX_RAD; // Analogue steer
 
     this.steerAngle = THREE.MathUtils.lerp(
       this.steerAngle,
@@ -464,21 +468,28 @@ export class PlayerController {
     this._forward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
 
     let targetAccel = 0;
-    if (this.keys.w) {
+    let forwardAmount = this.keys.w ? 1 : 0;
+    let backwardAmount = this.keys.s ? 1 : 0;
+
+    // Analogue joystick throttle
+    if (this.joystick.y > 0.05) forwardAmount = Math.max(forwardAmount, this.joystick.y);
+    if (this.joystick.y < -0.05) backwardAmount = Math.max(backwardAmount, -this.joystick.y);
+
+    if (forwardAmount > 0) {
       const speedRatio = Math.max(0, this.currentSpeed) / MAX_SPEED;
       const drag = Math.pow(speedRatio, 2);
-      targetAccel = ACCELERATION * Math.max(0, 1.0 - drag);
-    } else if (this.keys.s) {
+      targetAccel = ACCELERATION * Math.max(0, 1.0 - drag) * forwardAmount;
+    } else if (backwardAmount > 0) {
       if (this.currentSpeed > 0.5) {
-        targetAccel = -BRAKE_DECEL;
+        targetAccel = -BRAKE_DECEL * backwardAmount;
       } else {
-        targetAccel = -REVERSE_ACCEL;
+        targetAccel = -REVERSE_ACCEL * backwardAmount;
       }
     } else {
       if (this.currentSpeed < AUTO_FORWARD) {
         targetAccel = ACCELERATION * 0.3;
       } else {
-        targetAccel = -2.0;
+        targetAccel = 0;
       }
     }
 
@@ -626,5 +637,38 @@ export class PlayerController {
 
     window.addEventListener('keydown', (e) => handler(e, true));
     window.addEventListener('keyup', (e) => handler(e, false));
+
+    // Mobile Virtual Joystick Overlay
+    const isMobile = window.matchMedia('(pointer: coarse)').matches || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      const zone = document.createElement('div');
+      zone.style.position = 'absolute';
+      zone.style.width = '100%';
+      zone.style.height = '100%';
+      zone.style.bottom = '0';
+      zone.style.left = '0';
+      zone.style.zIndex = '999';
+      zone.style.touchAction = 'none'; // Prevent browser scrolling
+      document.body.appendChild(zone);
+
+      const manager = nipplejs.create({
+        zone: zone,
+        mode: 'dynamic',
+        color: 'white',
+        size: 150
+      });
+
+      manager.on('move', (evt, data) => {
+        if (!data || !data.vector) return;
+        this.joystick.x = data.vector.x; // -1 to 1 (left to right)
+        this.joystick.y = data.vector.y; // -1 to 1 (down to up)
+      });
+      
+      manager.on('end', () => {
+        this.joystick.x = 0;
+        this.joystick.y = 0;
+      });
+    }
   }
 }

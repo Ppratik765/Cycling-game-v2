@@ -83,10 +83,14 @@ async function init() {
     const rapierWorld = new RAPIER.World({ x: 0.0, y: -14.0, z: 0.0 });
     console.log('✅ Rapier3D initialised');
 
+    // ── Mobile Detection & Downscaling ────────────────────────
+    const isMobile = window.matchMedia('(pointer: coarse)').matches || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
     // ── Renderer ──────────────────────────────────────────────
     const container = document.getElementById('app');
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    const renderer = new THREE.WebGLRenderer({ antialias: !isMobile, powerPreference: 'high-performance' });
+    const maxPixelRatio = isMobile ? 1.0 : 1.5;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
